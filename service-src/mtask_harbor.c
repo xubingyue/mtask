@@ -5,7 +5,7 @@
 //  Created by TTc on 14/8/6.
 //  Copyright (c) 2015年 TTc. All rights reserved.
 //
-
+//远程消息代理模块,它只负责管理 tcp 连接的 fd, 而不必操心连接连接的过程。这样，也不再依赖额外的 gate 服务，只需要做简单的拼包处理即可
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>

@@ -589,7 +589,7 @@ _luaseri_pack(lua_State *L) {
     
     return 2;
 }
-
+//unpack
 int
 _luaseri_unpack(lua_State *L) {
     if (lua_isnoneornil(L, 1)) {
