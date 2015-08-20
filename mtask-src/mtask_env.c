@@ -5,8 +5,9 @@
 //  Created by TTc on 14/9/31.
 //  Copyright (c) 2015年 TTc. All rights reserved.
 //
-
+#include "mtask.h"
 #include "mtask_env.h"
+#include "mtask_spinlock.h"
 
 #include <lua.h>
 #include <lauxlib.h>
@@ -17,27 +18,16 @@
  *  set & get Lua env
  */
 struct mtask_env {
-    int lock;
+    struct spinlock lock;
     lua_State *L;   /*lua vm*/
 };
 
 
 static struct mtask_env *E = NULL;
 
-/*get the lock*/
-#define LOCK(q) while(__sync_lock_test_and_set(&(q)->lock,1)){}
-/*release the lock*/
-#define UNLOCK(q) __sync_lock_release(&(q)->lock);
 
-/**
- *      init the handle of lua
- */
-void
-mtask_env_init() {
-    E = malloc(sizeof(*E));
-    E->lock = 0;
-    E->L = luaL_newstate();
-}
+
+
 /**
  *  ket = value
  *
@@ -47,7 +37,7 @@ mtask_env_init() {
  */
 const char *
 mtask_getenv(const char *key) {
-    LOCK(E);
+    SPIN_LOCK(E)
     
     lua_State *L = E->L;
     
@@ -55,7 +45,7 @@ mtask_getenv(const char *key) {
     const char *result = lua_tostring(L, -1);
     lua_pop(L, 1);
     
-    UNLOCK(E);
+    SPIN_UNLOCK(E)
     
     return result;
 }
@@ -67,7 +57,7 @@ mtask_getenv(const char *key) {
  */
 void
 mtask_setenv(const char *key,const char *value) {
-    LOCK(E)
+    SPIN_LOCK(E)
     
     lua_State *L = E->L;
     lua_getglobal(L, key);
@@ -76,7 +66,15 @@ mtask_setenv(const char *key,const char *value) {
     lua_pushstring(L, value);
     lua_setglobal(L, key);
     
-    UNLOCK(E)
+    SPIN_UNLOCK(E)
 }
 
-
+/**
+ *      init the handle of lua
+ */
+void
+mtask_env_init() {
+    E = mtask_malloc(sizeof(*E));
+    SPIN_INIT(E)
+    E->L = luaL_newstate();
+}
