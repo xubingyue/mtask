@@ -11,15 +11,15 @@
 
 #include <stdint.h>
 
-void mtask_timer_init(void);
-
-uint32_t mtask_gettimer_fixsec(void);
-
-uint32_t mtask_gettime(void);
-
-void mtask_updatetime(void);
 
 int mtask_timeout(uint32_t handle, int time, int session);
 
+void mtask_updatetime(void);
+
+uint32_t mtask_gettime(void);
+
+uint32_t mtask_gettimer_fixsec(void);
+
+void mtask_timer_init(void);
 
 #endif /* defined(__mtask__mtask_timer__) */

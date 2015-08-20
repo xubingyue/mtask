@@ -11,20 +11,26 @@
 
 #include <stdint.h>
 
-#include "mtask_harbor.h"
+// reserve high 8 bits for remote id
 
+
+#define HANDLE_MASK 0xffffff
+#define HANDLE_REMOTE_SHIFT 24
 struct mtask_context;
 
-void mtask_handle_init(int harbor);
 
 uint32_t mtask_handle_register(struct mtask_context *ctx);
-
 int mtask_handle_retire(uint32_t handle);
-
 struct mtask_context * mtask_handle_grab(uint32_t handle);
+void mtask_handle_retireall();
+
+
 
 uint32_t mtask_handle_findname(const char *name);
 
+const char * mtask_handle_namehandle(uint32_t handle, const char *name);
 
+
+void mtask_handle_init(int harbor);
 
 #endif /* defined(__mtask__mtask_handle__) */

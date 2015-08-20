@@ -15,23 +15,23 @@
 #include "mtask_mq.h"
 #include "mtask_handle.h"
 #include "mtask.h"
-
+#include "mtask_spinlock.h"
 
 #define DEFAULT_QUEUE_SIZE 64
 #define MAX_GLOBAL_MQ 0x10000   
 
-
+// 0 means mq is not in global mq.
+// 1 means mq is in global mq , or the message is dispatching.
 #define MQ_IN_GLOBAL    1
 #define MQ_OVERLOAD     1024
 
 
 struct message_queue {
+	struct spinlock lock;
     uint32_t handle;   /*handle id of module*/
     int cap;
     int head;
     int tail;
-    int lock;
-    
     int release;
     int in_global;
     int overload;
@@ -43,30 +43,22 @@ struct message_queue {
 struct global_queue {
     struct message_queue *head;
     struct message_queue *tail;
-    int lock;
+    struct spinlock lock;
 };
 
 static struct global_queue *Q = NULL;
 
-#define LOCK(q) while(__sync_lock_test_and_set(&(q)->lock,1)){}
-
-#define UNLOCK(q) __sync_lock_release(&(q)->lock);
 
 
 
 
-void
-mtask_mq_init() {
-    struct global_queue *q = mtask_malloc(sizeof(*q));
-    memset(q, 0, sizeof(*q));
-    Q = q;
-}
+
 
 void
 mtask_globalmq_push(struct message_queue *queue) {
     struct global_queue *q = Q;
     
-    LOCK(q);
+    SPIN_LOCK(q)
     assert(queue->next == NULL);
     if(q->tail) {
         q->tail->next = queue;
@@ -75,15 +67,15 @@ mtask_globalmq_push(struct message_queue *queue) {
         q->head = q->tail = queue;
     }
     
-    UNLOCK(q);
+    SPIN_UNLOCK(q)
 }
 
 
 struct message_queue *
 mtask_globalmq_pop(void) {
-    struct global_queue *q = 0;
+    struct global_queue *q = Q;
     
-    LOCK(q);
+    SPIN_LOCK(q)
     struct message_queue *mq = q->head;
     if(mq) {
         q->head = mq->next;
@@ -94,7 +86,7 @@ mtask_globalmq_pop(void) {
         mq->next = NULL;
     }
     
-    UNLOCK(q);
+    SPIN_UNLOCK(q)
     
     return mq;
 }
@@ -106,8 +98,10 @@ mtask_mq_create(uint32_t handle) {
     q->cap = DEFAULT_QUEUE_SIZE;
     q->head = 0;
     q->tail = 0;
-    q->lock = 0;
-    
+    SPIN_INIT(q)
+    	// When the queue is create (always between service create and service init) ,
+	// set in_global flag to avoid push it to global queue .
+	// If the service init success, skynet_context_new will call skynet_mq_force_push to push it to global queue.
     
     q->in_global = MQ_IN_GLOBAL;
     q->release = 0;
@@ -121,48 +115,56 @@ mtask_mq_create(uint32_t handle) {
 }
 
 
+
 static void
-expand_queue(struct message_queue *q) {
-    struct mtask_message *new_queue = mtask_malloc(sizeof(struct mtask_message)* q->cap * 2);
-    int i;
-    for (i=0; i<q->cap; i++) {
-        new_queue[i] = q->queue[(q->head + i) % q->cap];
-    }
-    q->head = 0;
-    q->tail = q->cap;
-    q->cap *= 2;
-    
+_release(struct message_queue *q) {
+    assert(q->next == NULL);
     mtask_free(q->queue);
-    q->queue = new_queue;
+    mtask_free(q);
+}
+/*get handle of module in message_queue*/
+uint32_t
+mtask_mq_handle(struct message_queue *q) {
+    return q->handle;
 }
 
-void
-mtask_mq_push(struct message_queue *q,struct mtask_message *message) {
-    assert(message);
-    LOCK(q)
+
+
+int
+mtask_mq_length(struct message_queue *q) {
+    int head,tail,cap;
     
-    q->queue[q->tail] = *message;
-    if(++ q->tail >= q->cap) {
-        q->tail = 0;
+    SPIN_LOCK(q)
+    head = q->head;
+    tail = q->tail;
+    cap  = q->cap;
+    
+    SPIN_UNLOCK(q)
+    
+    if(head <= tail) {
+        return tail - head;
     }
-    
-    if(q->head == q->tail) {
-        expand_queue(q);
-    }
-    
-    if(q->in_global == 0) {
-        q->in_global = MQ_IN_GLOBAL;
-        mtask_globalmq_push(q);
-    }
-    
-    UNLOCK(q)
+    return tail + cap -head;
 }
+
+/*Check whether the message_queue is load */
+int
+mtask_mq_overload(struct message_queue *q) {
+    if(q->overload) {
+        int overload = q->overload;
+        q->overload = 0;
+        return overload;
+    }
+    return 0;
+}
+
+
 /*In the services queue (per client mq) team head, POP out the MSG */
 /* 0 ==  success ; 1 = fail*/
 int
 mtask_mq_pop(struct message_queue *q,struct mtask_message *message) {
     int ret = 1;
-    LOCK(q);
+    SPIN_LOCK(q)
     
     if(q->head != q->tail) {
         *message = q->queue[q->head++];
@@ -185,6 +187,7 @@ mtask_mq_pop(struct message_queue *q,struct mtask_message *message) {
 
         }
     } else {
+  	    // reset overload_threshold when queue is empty
         q->overload_threshold = MQ_OVERLOAD;
     }
     
@@ -192,50 +195,73 @@ mtask_mq_pop(struct message_queue *q,struct mtask_message *message) {
         q->in_global = 0;
     }
 
-    UNLOCK(q)
+    SPIN_UNLOCK(q)
     
     return ret;
 }
 
-
-int
-mtask_mq_length(struct message_queue *q) {
-    int head,tail,cap;
-    
-    LOCK(q)
-    head = q->head;
-    tail = q->tail;
-    cap  = q->cap;
-    
-    UNLOCK(q)
-    
-    if(head <= tail) {
-        return tail - head;
-    }
-    return tail + cap -head;
-}
-/*Check whether the message_queue is load */
-int
-mtask_mq_overload(struct message_queue *q) {
-    if(q->overload) {
-        int overload = q->overload;
-        q->overload = 0;
-        return overload;
-    }
-    return 0;
-}
-/*get handle of module in message_queue*/
-uint32_t
-mtask_mq_handle(struct message_queue *q) {
-    return q->handle;
-}
-
 static void
-_release(struct message_queue *q) {
-    assert(q->next == NULL);
+expand_queue(struct message_queue *q) {
+    struct mtask_message *new_queue = mtask_malloc(sizeof(struct mtask_message)* q->cap * 2);
+    int i;
+    for (i=0; i<q->cap; i++) {
+        new_queue[i] = q->queue[(q->head + i) % q->cap];
+    }
+    q->head = 0;
+    q->tail = q->cap;
+    q->cap *= 2;
+    
     mtask_free(q->queue);
-    mtask_free(q);
+    q->queue = new_queue;
 }
+
+void
+mtask_mq_push(struct message_queue *q,struct mtask_message *message) {
+    assert(message);
+    SPIN_LOCK(q)
+    
+    q->queue[q->tail] = *message;
+    if(++ q->tail >= q->cap) {
+        q->tail = 0;
+    }
+    
+    if(q->head == q->tail) {
+        expand_queue(q);
+    }
+    
+    if(q->in_global == 0) {
+        q->in_global = MQ_IN_GLOBAL;
+        mtask_globalmq_push(q);
+    }
+    
+    SPIN_UNLOCK(q)
+}
+
+
+
+
+void
+mtask_mq_init() {
+    struct global_queue *q = mtask_malloc(sizeof(*q));
+    memset(q, 0, sizeof(*q));
+	SPIN_INIT(q);
+    Q = q;
+}
+
+
+void
+mtask_mq_mark_release(struct message_queue *q) {
+    SPIN_LOCK(q)
+    assert(q->release == 0);
+    q->release = 1;
+    if(q->in_global != MQ_IN_GLOBAL) {
+        mtask_globalmq_push(q);
+    }
+    
+    SPIN_UNLOCK(q)
+}
+
+
 
 
 static void
@@ -249,29 +275,18 @@ _drop_queue(struct message_queue *q,message_drop drop_func,void *ud) {
 
 void
 mtask_mq_release(struct message_queue *q,message_drop drop_func,void *ud) {
-    LOCK(q);
+    SPIN_LOCK(q)
     
     if(q->release) {
-        UNLOCK(q);
+        SPIN_UNLOCK(q)
         _drop_queue(q, drop_func, ud);
     } else {
         mtask_globalmq_push(q);
-        UNLOCK(q);
+        SPIN_UNLOCK(q)
     }
 }
 
 
-void
-mtask_mq_mark_release(struct message_queue *q) {
-    LOCK(q)
-    assert(q->release == 0);
-    q->release = 1;
-    if(q->in_global != MQ_IN_GLOBAL) {
-        mtask_globalmq_push(q);
-    }
-    
-    UNLOCK(q)
-}
 
 
 

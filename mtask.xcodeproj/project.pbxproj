@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		790BED491B7483EA0012C5C9 /* mtask_gate.c in Sources */ = {isa = PBXBuildFile; fileRef = 790BED481B7483EA0012C5C9 /* mtask_gate.c */; };
+		790BED491B7483EA0012C5C9 /* mtask_service_gate.c in Sources */ = {isa = PBXBuildFile; fileRef = 790BED481B7483EA0012C5C9 /* mtask_service_gate.c */; };
 		792E9DC21B7DDD3B0078FDC9 /* mtask_lua_multicast.c in Sources */ = {isa = PBXBuildFile; fileRef = 792E9DC01B7DDD3B0078FDC9 /* mtask_lua_multicast.c */; };
 		792E9DC41B7DEF470078FDC9 /* mtask_lua_mongo.c in Sources */ = {isa = PBXBuildFile; fileRef = 792E9DC31B7DEF470078FDC9 /* mtask_lua_mongo.c */; };
 		792E9DC61B7DF0670078FDC9 /* mtask_lua_stm.c in Sources */ = {isa = PBXBuildFile; fileRef = 792E9DC51B7DF0670078FDC9 /* mtask_lua_stm.c */; };
@@ -62,7 +62,7 @@
 		798B5D931B79F0760054E773 /* mtask_lua_bson.c in Sources */ = {isa = PBXBuildFile; fileRef = 798B5D921B79F0760054E773 /* mtask_lua_bson.c */; };
 		798B5D951B79F0CD0054E773 /* lsha1.c in Sources */ = {isa = PBXBuildFile; fileRef = 798B5D941B79F0CD0054E773 /* lsha1.c */; };
 		798B5D971B79F1330054E773 /* mtask_lua_crypt.c in Sources */ = {isa = PBXBuildFile; fileRef = 798B5D961B79F1330054E773 /* mtask_lua_crypt.c */; };
-		7999CFEB1B72F4EA00CF7BA0 /* mtask_snlua.c in Sources */ = {isa = PBXBuildFile; fileRef = 7999CFEA1B72F4EA00CF7BA0 /* mtask_snlua.c */; };
+		7999CFEB1B72F4EA00CF7BA0 /* mtask_service_snlua.c in Sources */ = {isa = PBXBuildFile; fileRef = 7999CFEA1B72F4EA00CF7BA0 /* mtask_service_snlua.c */; };
 		79CED7181B6B157800378C7E /* compat-5.2.c in Sources */ = {isa = PBXBuildFile; fileRef = 79CED6CB1B6B157800378C7E /* compat-5.2.c */; };
 		79CED7191B6B157800378C7E /* md5.c in Sources */ = {isa = PBXBuildFile; fileRef = 79CED6CD1B6B157800378C7E /* md5.c */; };
 		79CED71A1B6B157800378C7E /* md5lib.c in Sources */ = {isa = PBXBuildFile; fileRef = 79CED6CF1B6B157800378C7E /* md5lib.c */; };
@@ -82,8 +82,8 @@
 		79DCE8DA1B78F31D002427E5 /* mtask_start.c in Sources */ = {isa = PBXBuildFile; fileRef = 79DCE8C51B78F31D002427E5 /* mtask_start.c */; };
 		79DCE8DB1B78F31D002427E5 /* mtask_timer.c in Sources */ = {isa = PBXBuildFile; fileRef = 79DCE8C61B78F31D002427E5 /* mtask_timer.c */; };
 		79DCE8DC1B78F31D002427E5 /* socket_server.c in Sources */ = {isa = PBXBuildFile; fileRef = 79DCE8CB1B78F31D002427E5 /* socket_server.c */; };
-		79E17CFF1B73321300491537 /* mtask_logger.c in Sources */ = {isa = PBXBuildFile; fileRef = 79E17CFE1B73321300491537 /* mtask_logger.c */; };
-		79E17D011B73563600491537 /* mtask_harbor.c in Sources */ = {isa = PBXBuildFile; fileRef = 79E17D001B73563600491537 /* mtask_harbor.c */; };
+		79E17CFF1B73321300491537 /* mtask_service_logger.c in Sources */ = {isa = PBXBuildFile; fileRef = 79E17CFE1B73321300491537 /* mtask_service_logger.c */; };
+		79E17D011B73563600491537 /* mtask_service_harbor.c in Sources */ = {isa = PBXBuildFile; fileRef = 79E17D001B73563600491537 /* mtask_service_harbor.c */; };
 		79F5EFA11B84824900792868 /* mtask_lua_mysqlaux.c in Sources */ = {isa = PBXBuildFile; fileRef = 79F5EFA01B84824900792868 /* mtask_lua_mysqlaux.c */; };
 /* End PBXBuildFile section */
 
@@ -100,7 +100,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		790BED481B7483EA0012C5C9 /* mtask_gate.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = mtask_gate.c; sourceTree = "<group>"; };
+		790BED481B7483EA0012C5C9 /* mtask_service_gate.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = mtask_service_gate.c; sourceTree = "<group>"; };
 		790BED4A1B74AD000012C5C9 /* hashid.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = hashid.h; sourceTree = "<group>"; };
 		790BED4B1B74AF0F0012C5C9 /* databuffer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = databuffer.h; sourceTree = "<group>"; };
 		792E9DC01B7DDD3B0078FDC9 /* mtask_lua_multicast.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = mtask_lua_multicast.c; sourceTree = "<group>"; };
@@ -189,7 +189,7 @@
 		798B5D961B79F1330054E773 /* mtask_lua_crypt.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = mtask_lua_crypt.c; sourceTree = "<group>"; };
 		799665621B859D5E00D3865E /* mtask_atomic.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = mtask_atomic.h; sourceTree = "<group>"; };
 		799665631B85A5A300D3865E /* mtask_spinlock.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = mtask_spinlock.h; sourceTree = "<group>"; };
-		7999CFEA1B72F4EA00CF7BA0 /* mtask_snlua.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = mtask_snlua.c; sourceTree = "<group>"; };
+		7999CFEA1B72F4EA00CF7BA0 /* mtask_service_snlua.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = mtask_service_snlua.c; sourceTree = "<group>"; };
 		79CED6A71B6B140D00378C7E /* mtask */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = mtask; sourceTree = BUILT_PRODUCTS_DIR; };
 		79CED6CB1B6B157800378C7E /* compat-5.2.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "compat-5.2.c"; sourceTree = "<group>"; };
 		79CED6CC1B6B157800378C7E /* compat-5.2.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "compat-5.2.h"; sourceTree = "<group>"; };
@@ -232,8 +232,8 @@
 		79DCE8CA1B78F31D002427E5 /* socket_poll.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = socket_poll.h; sourceTree = "<group>"; };
 		79DCE8CB1B78F31D002427E5 /* socket_server.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = socket_server.c; sourceTree = "<group>"; };
 		79DCE8CC1B78F31D002427E5 /* socket_server.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = socket_server.h; sourceTree = "<group>"; };
-		79E17CFE1B73321300491537 /* mtask_logger.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = mtask_logger.c; sourceTree = "<group>"; };
-		79E17D001B73563600491537 /* mtask_harbor.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = mtask_harbor.c; sourceTree = "<group>"; };
+		79E17CFE1B73321300491537 /* mtask_service_logger.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = mtask_service_logger.c; sourceTree = "<group>"; };
+		79E17D001B73563600491537 /* mtask_service_harbor.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = mtask_service_harbor.c; sourceTree = "<group>"; };
 		79F5EFA01B84824900792868 /* mtask_lua_mysqlaux.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = mtask_lua_mysqlaux.c; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -385,10 +385,10 @@
 		79CED6B31B6B14A000378C7E /* service-src */ = {
 			isa = PBXGroup;
 			children = (
-				7999CFEA1B72F4EA00CF7BA0 /* mtask_snlua.c */,
-				79E17CFE1B73321300491537 /* mtask_logger.c */,
-				79E17D001B73563600491537 /* mtask_harbor.c */,
-				790BED481B7483EA0012C5C9 /* mtask_gate.c */,
+				7999CFEA1B72F4EA00CF7BA0 /* mtask_service_snlua.c */,
+				79E17CFE1B73321300491537 /* mtask_service_logger.c */,
+				79E17D001B73563600491537 /* mtask_service_harbor.c */,
+				790BED481B7483EA0012C5C9 /* mtask_service_gate.c */,
 				790BED4A1B74AD000012C5C9 /* hashid.h */,
 				790BED4B1B74AF0F0012C5C9 /* databuffer.h */,
 			);
@@ -521,11 +521,11 @@
 				792E9E291B7DF3330078FDC9 /* lutf8lib.c in Sources */,
 				798B5D971B79F1330054E773 /* mtask_lua_crypt.c in Sources */,
 				798B5D911B79E8330054E773 /* mtask_lua_sharedata.c in Sources */,
-				790BED491B7483EA0012C5C9 /* mtask_gate.c in Sources */,
+				790BED491B7483EA0012C5C9 /* mtask_service_gate.c in Sources */,
 				798B5D8F1B79E2B20054E773 /* mtask_lua_cluster.c in Sources */,
 				792E9E0A1B7DF3330078FDC9 /* lbaselib.c in Sources */,
 				792E9E141B7DF3330078FDC9 /* lgc.c in Sources */,
-				79E17CFF1B73321300491537 /* mtask_logger.c in Sources */,
+				79E17CFF1B73321300491537 /* mtask_service_logger.c in Sources */,
 				79DCE8D81B78F31D002427E5 /* mtask_server.c in Sources */,
 				792E9DC61B7DF0670078FDC9 /* mtask_lua_stm.c in Sources */,
 				79DCE8D21B78F31D002427E5 /* mtask_harbor.c in Sources */,
@@ -557,11 +557,11 @@
 				798B5D8B1B79BAF40054E773 /* sproto.c in Sources */,
 				792E9E181B7DF3330078FDC9 /* llex.c in Sources */,
 				79DCE8D91B78F31D002427E5 /* mtask_socket.c in Sources */,
-				7999CFEB1B72F4EA00CF7BA0 /* mtask_snlua.c in Sources */,
+				7999CFEB1B72F4EA00CF7BA0 /* mtask_service_snlua.c in Sources */,
 				792E9E281B7DF3330078FDC9 /* lundump.c in Sources */,
 				798B5D821B79B4860054E773 /* mtask_lua_memory.c in Sources */,
 				79DCE8D11B78F31D002427E5 /* mtask_handle.c in Sources */,
-				79E17D011B73563600491537 /* mtask_harbor.c in Sources */,
+				79E17D011B73563600491537 /* mtask_service_harbor.c in Sources */,
 				792E9E1D1B7DF3330078FDC9 /* lopcodes.c in Sources */,
 				792E9E191B7DF3330078FDC9 /* lmathlib.c in Sources */,
 				792E9E1B1B7DF3330078FDC9 /* loadlib.c in Sources */,

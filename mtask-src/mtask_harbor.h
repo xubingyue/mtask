@@ -15,8 +15,7 @@
 #define GLOBALNAME_LENGTH  16
 #define REMOTE_MAX 256
 
-#define HANDLE_MASK 0xffffff    /*保留高8位用于远程ID*/
-#define HANDLE_REMOTE_SHIFT 24
+
 
 
 struct remote_name {

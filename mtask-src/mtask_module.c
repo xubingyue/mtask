@@ -5,8 +5,6 @@
 //  Created by TTc on 14/9/31.
 //  Copyright (c) 2015年 TTc. All rights reserved.
 //
-#include "mtask.h"
-#include "mtask_module.h"
 
 
 #include <assert.h>
@@ -16,29 +14,23 @@
 #include <stdint.h>
 #include <dlfcn.h>
 
+#include "mtask.h"
+#include "mtask_module.h"
+#include "mtask_spinlock.h"
+
 #define MAX_MODULE_TYPE 32
 
 /*(The dynamic library) manager of all module */
 struct modules {
     int count;
-    int lock;
+    struct spinlock lock;
     const char *path;                      /*待装载的模块目录*/
     struct mtask_module m[MAX_MODULE_TYPE];/*存放装载的模块*/
 };
 
 static struct modules *M = NULL;    /*global*/
 
-/*check module load*/
-static struct mtask_module *
-_query(const char *name) {
-    int i;
-    for (i=0; i<M->count; i++) {
-        if(strcmp(M->m[i].name, name) == 0) {
-            return &M->m[i];
-        }
-    }
-    return NULL;
-}
+
 /*load the dynamic library*/
 static void *
 _try_open(struct modules *m,const char *name) {
@@ -51,7 +43,8 @@ _try_open(struct modules *m,const char *name) {
     /*search path*/
     void *dl = NULL;
     char tmp[sz];
-    do {
+    do 
+	{
         memset(tmp, 0, sz);
         while (*path == ';') path++;
         if(*path == '\0')break;
@@ -80,6 +73,18 @@ _try_open(struct modules *m,const char *name) {
     }
     return dl;
 }
+
+/*check module load*/
+static struct mtask_module *
+_query(const char *name) {
+    int i;
+    for (i=0; i<M->count; i++) {
+        if(strcmp(M->m[i].name, name) == 0) {
+            return &M->m[i];
+        }
+    }
+    return NULL;
+}
 /* set the dynamic library  (create/init/release/signal) callback function*/
 static int
 _open_sym(struct mtask_module *mod) {
@@ -106,28 +111,46 @@ _open_sym(struct mtask_module *mod) {
     
 }
 
-void
-mtask_module_init(const char *path) {
-    struct modules *m = malloc(sizeof(*m));
+struct mtask_module *
+mtask_module_query(const char *name) {
+    struct mtask_module * result = _query(name);
+    if (result) return result;
     
-    m->count = 0;
-    m->path = mtask_strdup(path);
-    m->lock = 0;
+    SPIN_LOCK(M)
+
+    result = _query(name); // double check
     
-    M = m;
+    if(result == NULL  && M->count < MAX_MODULE_TYPE) {
+        int index = M->count;
+        
+        void *dl = _try_open(M, name);
+        if(dl) {
+            M->m[index].name = name;
+            M->m[index].module = dl;
+            if(_open_sym(&M->m[index]) == 0) {
+                M->m[index].name = mtask_strdup(name);
+                M->count++;
+                result = &M->m[index];
+            }
+        }
+    }
+    SPIN_UNLOCK(M)
+
+    return result;
 }
+
 
 
 void
 mtask_module_insert(struct mtask_module *mod) {
-   	while(__sync_lock_test_and_set(&M->lock,1)) {}
+   	SPIN_LOCK(M)
     
     struct mtask_module * m = _query(mod->name);
     assert(m == NULL && M->count < MAX_MODULE_TYPE);
     int index = M->count;
     M->m[index] = *mod;
     ++M->count;
-    __sync_lock_release(&M->lock);
+    SPIN_UNLOCK(M)
 }
 /*create  Lua module callback function */
 void *
@@ -160,30 +183,15 @@ mtask_module_instance_signal(struct mtask_module *m,void *inst,int signal) {
     }
 }
 
-struct mtask_module *
-mtask_module_query(const char *name) {
-    struct mtask_module * result = _query(name);
-    if (result) return result;
-    
-    while(__sync_lock_test_and_set(&M->lock,1)) {}
 
-    result = _query(name);
-    
-    if(result == NULL  && M->count < MAX_MODULE_TYPE) {
-        int index = M->count;
-        
-        void *dl = _try_open(M, name);
-        if(dl) {
-            M->m[index].name = name;
-            M->m[index].module = dl;
-            if(_open_sym(&M->m[index]) == 0) {
-                M->m[index].name = mtask_strdup(name);
-                M->count++;
-                result = &M->m[index];
-            }
-        }
-    }
-    __sync_lock_release(&M->lock);
 
-    return result;
+void
+mtask_module_init(const char *path) {
+    struct modules *m = malloc(sizeof(*m));
+    
+    m->count = 0;
+    m->path = mtask_strdup(path);
+    SPIN_INIT(m)
+    
+    M = m;
 }

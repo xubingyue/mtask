@@ -16,7 +16,7 @@
 #include "mtask_mq.h"
 #include "mtask_server.h"
 #include "mtask_handle.h"
-
+#include "mtask_spinlock.h"
 #if defined(__APPLE__)
 #include <sys/time.h>
 #endif
@@ -24,8 +24,6 @@
 
 typedef void (*timer_execute_func)(void *ud,void *arg); /*callback trigger by timer*/
 
-#define LOCK(q) while (__sync_lock_test_and_set(&(q)->lock,1)) {}
-#define UNLOCK(q) __sync_lock_release(&(q)->lock);
 
 #define TIME_NEAR_SHIFT 8
 #define TIME_NEAR (1 << TIME_NEAR_SHIFT)
@@ -53,7 +51,7 @@ struct link_list {
 struct timer {
     struct link_list near[TIME_NEAR];
     struct link_list t[4][TIME_LEVEL];
-    int lock;
+	struct spinlock lock;
     uint32_t time;
     uint32_t current;
     uint32_t starttime;
@@ -63,6 +61,13 @@ struct timer {
 
 
 static struct timer * TI  = NULL;
+static inline struct timer_node *
+link_clear(struct link_list *list) {
+    struct timer_node *ret = list->head.next;
+    list->head.next = 0;
+    list->tail = &(list->head);
+    return ret;
+}
 
 static inline void
 link(struct link_list *list,struct timer_node *node) {
@@ -92,14 +97,23 @@ add_node(struct timer *T,struct timer_node *node) {
     }
 }
 
+static void
+timer_add(struct timer *T,void *arg,size_t sz,int time) {
+    /*alloc a  node ,as arg store after node */
+    struct timer_node *node = (struct timer_node *)mtask_malloc(sizeof(*node)+sz);
+    /*copy arg*/
+    memcpy(node+1,arg,sz);
+    
+   	SPIN_LOCK(T)
+    /*update the expire time*/
+    node->expire=time+T->time;
+    /*add the node into timer handle*/
+    add_node(T,node);
+    
+    SPIN_UNLOCK(T)
 
-static inline struct timer_node *
-link_clear(struct link_list *list) {
-    struct timer_node *ret = list->head.next;
-    list->head.next = 0;
-    list->tail = &(list->head);
-    return ret;
 }
+
 
 
 
@@ -146,7 +160,7 @@ dispatch_list(struct timer_node *current) {
         message.source = 0;
         message.session = event->session;
         message.data = NULL;
-        message.sz = PTYPE_RESPONSE << HANDLE_REMOTE_SHIFT;
+        message.sz = (size_t)PTYPE_RESPONSE << MESSAGE_TYPE_SHIFT;
         
         mtask_context_push(event->handle, &message);
         
@@ -163,17 +177,17 @@ timer_execute(struct timer *T) {
     
     while (T->near[idx].head.next) {
         struct timer_node *current = link_clear(&T->near[idx]);
-        UNLOCK(T);
+        SPIN_UNLOCK(T)
         // dispatch_list don't need lock T
         dispatch_list(current);
-        LOCK(T);
+        SPIN_LOCK(T)
     }
 }
 
 
 static void
 timer_update(struct timer *T) {
-    LOCK(T);
+    SPIN_LOCK(T)
     
     // try to dispatch timeout 0 (rare condition)
     timer_execute(T);
@@ -183,27 +197,12 @@ timer_update(struct timer *T) {
     
     timer_execute(T);
     
-    UNLOCK(T);
+    SPIN_UNLOCK(T)
 }
 
 
 
-static void
-timer_add(struct timer *T,void *arg,size_t sz,int time) {
-    /*alloc a  node ,as arg store after node */
-    struct timer_node *node = (struct timer_node *)mtask_malloc(sizeof(*node)+sz);
-    /*copy arg*/
-    memcpy(node+1,arg,sz);
-    
-    LOCK(T);
-    /*update the expire time*/
-    node->expire=time+T->time;
-    /*add the node into timer handle*/
-    add_node(T,node);
-    
-    UNLOCK(T);
 
-}
 
 
 static struct timer *
@@ -221,11 +220,40 @@ timer_create_timer() {
             link_clear(&r->t[i][j]);
         }
     }
-    r->lock = 0;
+    SPIN_INIT(r)
     r->current = 0;
     
     return r;
 }
+
+int
+mtask_timeout(uint32_t handle, int time, int session) {
+    if (time == 0) {
+        struct mtask_message message;
+        message.source = 0;
+        /*set session id*/
+        message.session = session;
+        message.data = NULL;
+        /*makr this msg as response*/
+        message.sz = PTYPE_RESPONSE << MESSAGE_TYPE_SHIFT;
+        /*send this msg to the module,trigger directly*/
+        if (mtask_context_push(handle, &message)) {
+            return -1;
+        }
+    } else {
+        struct timer_event event;
+        /*set module id*/
+        event.handle = handle;
+        /*set session*/
+        event.session = session;
+        /*add this event to timer list,trigger after time*/
+        timer_add(TI, &event, sizeof(event), time);
+    }
+    
+    return session;
+}
+
+
 /**
  *  centisecond : 1/100 second
  *
@@ -272,25 +300,8 @@ gettime(){
 }
 
 
-void
-mtask_timer_init(void) {
-    TI = timer_create_timer();
-    systime(&TI->starttime,&TI->current);
-    uint64_t point = gettime();
-    TI->current_point = point;
-    TI->origin_point = point;
-}
 
 
-uint32_t
-mtask_gettimer_fixsec(void) {
-    return TI->starttime;
-}
-
-uint32_t
-mtask_gettime(void) {
-    return TI->current;
-}
 
 
 void
@@ -318,31 +329,25 @@ mtask_updatetime(void) {
     
 }
 
-int
-mtask_timeout(uint32_t handle, int time, int session) {
-    if (time == 0) {
-        struct mtask_message message;
-        message.source = 0;
-        /*set session id*/
-        message.session = session;
-        message.data = NULL;
-        /*makr this msg as response*/
-        message.sz = PTYPE_RESPONSE << HANDLE_REMOTE_SHIFT;
-        /*send this msg to the module,trigger directly*/
-        if (mtask_context_push(handle, &message)) {
-            return -1;
-        }
-    } else {
-        struct timer_event event;
-        /*set module id*/
-        event.handle = handle;
-        /*set session*/
-        event.session = session;
-        /*add this event to timer list,trigger after time*/
-        timer_add(TI, &event, sizeof(event), time);
-    }
-    
-    return session;
+
+uint32_t
+mtask_gettimer_fixsec(void) {
+    return TI->starttime;
+}
+
+uint32_t
+mtask_gettime(void) {
+    return TI->current;
+}
+
+
+void
+mtask_timer_init(void) {
+    TI = timer_create_timer();
+    systime(&TI->starttime,&TI->current);
+    uint64_t point = gettime();
+    TI->current_point = point;
+    TI->origin_point = point;
 }
 
 

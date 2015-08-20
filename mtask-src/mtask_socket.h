@@ -18,7 +18,7 @@ struct mtask_context;
 #define MTASK_SOCKET_TYPE_ACCEPT        4
 #define MTASK_SOCKET_TYPE_ERROR         5
 #define MTASK_SOCKET_TYPE_UDP           6
-
+#define MTASK_SOCKET_TYPE_WARNING 		7
 
 struct mtask_socket_message {
     int type;       /*type of the msg*/
@@ -30,10 +30,10 @@ struct mtask_socket_message {
 void mtask_socket_init();
 
 void mtask_socket_exit();
-
+void mtask_socket_free();
 int mtask_socket_poll();
 
-void mtask_socket_free();
+
 
 int mtask_socket_send(struct mtask_context *ctx, int id,void *buffer,int sz);
 

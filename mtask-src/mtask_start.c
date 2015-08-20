@@ -48,13 +48,6 @@ struct worker_parm {
 #define CHECK_ABORT if(mtask_context_total()==0) break;
 
 
-static void
-wakeup(struct monitor *m,int busy) {
-     //如果睡眠线程数大于等于总工作线程数-busy(代表需要保持忙的线程数)
-    if(m->sleep == m->count - busy) {
-        pthread_cond_signal(&m->cond);
-    }
-}
 
 static void
 create_thread(pthread_t *thread,void *(*start_routine) (void*),void *arg) {
@@ -64,6 +57,47 @@ create_thread(pthread_t *thread,void *(*start_routine) (void*),void *arg) {
     }
 }
 
+static void
+wakeup(struct monitor *m,int busy) {
+     //如果睡眠线程数大于等于总工作线程数-busy(代表需要保持忙的线程数)
+    if(m->sleep >= m->count - busy) {
+		// signal sleep worker, "spurious wakeup" is harmless
+        pthread_cond_signal(&m->cond);
+    }
+}
+
+
+
+/*socket threads function*/
+static void *
+thread_socket(void *p) {
+    struct  monitor *m = p;
+    mtask_initthread(THREAD_SOCKET);
+    for(;;) {
+        int r = mtask_socket_poll();
+        if (r==0)break;
+        if (r<0) {
+            CHECK_ABORT
+            continue;
+        }
+        wakeup(m, 0);
+    }
+    return NULL;
+}
+
+/*release all mtask_monitor */
+static void
+free_monitor(struct monitor *m) {
+    int i ;
+    int n = m->count;
+    for (i=0; i<n; i++) {
+        mtask_monitor_delete(m->tm[i]);
+    }
+    pthread_mutex_destroy(&m->mutex);
+    pthread_cond_destroy(&m->cond);
+    mtask_free(m->tm);
+    mtask_free(m);
+}
 static void *
 thread_monitor(void *p) {
     struct monitor *m = p;
@@ -82,7 +116,6 @@ thread_monitor(void *p) {
     }
     return NULL;
 }
-
 static void *
 thread_timer(void *p) {
     struct monitor *m = p;
@@ -95,8 +128,9 @@ thread_timer(void *p) {
         wakeup(m,m->count-1);
         usleep(2500);
     }
-    
+    // signal sleep worker, "spurious wakeup" is harmless
     mtask_socket_exit();
+// wakeup all worker thread	
     pthread_mutex_lock(&m->mutex);
     m->quit = 1;
     pthread_cond_broadcast(&m->cond);
@@ -104,23 +138,6 @@ thread_timer(void *p) {
     
     return NULL;
 }
-/*socket threads function*/
-static void *
-thread_socket(void *p) {
-    struct  monitor *m = p;
-    mtask_initthread(THREAD_SOCKET);
-    for(;;) {
-        int r = mtask_socket_poll();
-        if (r==0)break;
-        if (r<0) {
-            CHECK_ABORT
-            continue;
-        }
-        wakeup(m, 0);
-    }
-    return NULL;
-}
-
 /*worker threads: used to dispatch msg(get the msg of global message queue)*/
 static void *
 thread_worker(void *p) {
@@ -137,6 +154,10 @@ thread_worker(void *p) {
         q = mtask_context_message_dispatch(tm, q, weight);
         if (q==NULL) {
             if (pthread_mutex_lock(&m->mutex) == 0) {
+				++ m->sleep;		
+			    // "spurious wakeup" is harmless,
+				// because skynet_context_message_dispatch() can be call at any time.
+				
                 if (!m->quit) {
                     pthread_cond_wait(&m->cond, &m->mutex);
                 }
@@ -158,34 +179,9 @@ thread_worker(void *p) {
     return NULL;
 }
 
-static void
-bootstrap(struct mtask_context *logger,const char *cmdline) {
-    int sz = strlen(cmdline);
-    char name[sz+1];
-    char args[sz+1];
-    sscanf(cmdline, "%s %s",name,args);
-    
-    struct mtask_context *ctx = mtask_context_new(name, args);
-    if(ctx == NULL) {
-        mtask_error(NULL, "Bootstrap error: %s\n",cmdline);
-        mtask_context_dispatchall(logger);
-        exit(1);
-    }
-}
 
-/*release all mtask_monitor */
-static void
-free_monitor(struct monitor *m) {
-    int i ;
-    int n = m->count;
-    for (i=0; i<n; i++) {
-        mtask_monitor_delete(m->tm[i]);
-    }
-    pthread_mutex_destroy(&m->mutex);
-    pthread_cond_destroy(&m->cond);
-    mtask_free(m->tm);
-    mtask_free(m);
-}
+
+
 
 static void
 start(int thread) {
@@ -242,6 +238,20 @@ start(int thread) {
     free_monitor(m);
 }
 
+static void
+bootstrap(struct mtask_context *logger,const char *cmdline) {
+    int sz = strlen(cmdline);
+    char name[sz+1];
+    char args[sz+1];
+    sscanf(cmdline, "%s %s",name,args);
+    
+    struct mtask_context *ctx = mtask_context_new(name, args);
+    if(ctx == NULL) {
+        mtask_error(NULL, "Bootstrap error: %s\n",cmdline);
+        mtask_context_dispatchall(logger);
+        exit(1);
+    }
+}
 void
 mtask_start(struct mtask_config *config) {
     if(config->daemon) {
@@ -260,7 +270,7 @@ mtask_start(struct mtask_config *config) {
     struct mtask_context *ctx = mtask_context_new(config->logservice,config->logger);
     
     if(ctx == NULL) {
-        fprintf(stderr, "Can't lanuch %s service \n",config->logservice);
+        fprintf(stderr, "Can't launch %s service \n",config->logservice);
         exit(1);
     }
     /*start second service(the first Lua service) :bootstrap*/

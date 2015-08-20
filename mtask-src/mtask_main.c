@@ -98,9 +98,9 @@ sigign() {
 
 int
 main(int argc, char *argv[]) {
-    const char *confilg_file = NULL;
+    const char *config_file = NULL;
     if(argc > 1) {
-        confilg_file = argv[1];
+        config_file = argv[1];
     } else {
         fprintf(stderr, "Need a config file.\n");
         return 1;
@@ -121,7 +121,7 @@ main(int argc, char *argv[]) {
     
     assert(err == LUA_OK);
     
-    lua_pushstring(L, confilg_file);
+    lua_pushstring(L, config_file);
     
     err = lua_pcall(L, 1, 1, 0);
     if (err) {

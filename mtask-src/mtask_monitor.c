@@ -12,7 +12,7 @@
 #include "mtask_monitor.h"
 #include "mtask.h"
 #include "mtask_server.h"
-
+#include "mtask_atomic.h"
 
 struct mtask_monitor {
     int version;        /*curr ver*/
@@ -41,6 +41,19 @@ mtask_monitor_new(){
  *  @param source      来源服务地址 source of the module
  *  @param destination 目的服务地址 dstination dst for the module
  */
+void
+mtask_monitor_delete(struct mtask_monitor *tm) {
+    mtask_free(tm);
+}
+
+
+/*trigger the monitor*/
+void
+mtask_monitor_trigger(struct mtask_monitor *tm,uint32_t source,uint32_t dst) {
+    tm->source = source;
+    tm->destination = dst;
+    ATOM_INC(&tm->version);
+}
 
 /* watchdog for check if the module unregister*/
 void
@@ -55,18 +68,6 @@ mtask_monitor_check(struct mtask_monitor *tm) {
     } else {  /*module maybe not in work, just update version*/
         tm->check_version = tm->version;
     }
-}
-/*trigger the monitor*/
-void
-mtask_monitor_trigger(struct mtask_monitor *m,uint32_t source,uint32_t dst) {
-    m->source = source;
-    m->destination = dst;
-    __sync_fetch_and_add(&m->version,1);
-}
-
-void
-mtask_monitor_delete(struct mtask_monitor *tm) {
-    mtask_free(tm);
 }
 
 
