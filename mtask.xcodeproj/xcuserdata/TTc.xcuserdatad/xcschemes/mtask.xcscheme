@@ -60,7 +60,11 @@
       </BuildableProductRunnable>
       <CommandLineArguments>
          <CommandLineArgument
-            argument = "/Users/administrator/Desktop/mtask/examples/config"
+            argument = "./mtask_web/web/web_config"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "./examples/config"
             isEnabled = "YES">
          </CommandLineArgument>
       </CommandLineArguments>

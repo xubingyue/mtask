@@ -24,7 +24,6 @@
 		792E9E121B7DF3330078FDC9 /* ldump.c in Sources */ = {isa = PBXBuildFile; fileRef = 792E9DD81B7DF3330078FDC9 /* ldump.c */; };
 		792E9E131B7DF3330078FDC9 /* lfunc.c in Sources */ = {isa = PBXBuildFile; fileRef = 792E9DD91B7DF3330078FDC9 /* lfunc.c */; };
 		792E9E141B7DF3330078FDC9 /* lgc.c in Sources */ = {isa = PBXBuildFile; fileRef = 792E9DDB1B7DF3330078FDC9 /* lgc.c */; };
-		792E9E151B7DF3330078FDC9 /* liblua.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 792E9DDD1B7DF3330078FDC9 /* liblua.a */; };
 		792E9E161B7DF3330078FDC9 /* linit.c in Sources */ = {isa = PBXBuildFile; fileRef = 792E9DDE1B7DF3330078FDC9 /* linit.c */; };
 		792E9E171B7DF3330078FDC9 /* liolib.c in Sources */ = {isa = PBXBuildFile; fileRef = 792E9DDF1B7DF3330078FDC9 /* liolib.c */; };
 		792E9E181B7DF3330078FDC9 /* llex.c in Sources */ = {isa = PBXBuildFile; fileRef = 792E9DE01B7DF3330078FDC9 /* llex.c */; };
@@ -85,6 +84,7 @@
 		79DCE8DC1B78F31D002427E5 /* socket_server.c in Sources */ = {isa = PBXBuildFile; fileRef = 79DCE8CB1B78F31D002427E5 /* socket_server.c */; };
 		79E17CFF1B73321300491537 /* mtask_logger.c in Sources */ = {isa = PBXBuildFile; fileRef = 79E17CFE1B73321300491537 /* mtask_logger.c */; };
 		79E17D011B73563600491537 /* mtask_harbor.c in Sources */ = {isa = PBXBuildFile; fileRef = 79E17D001B73563600491537 /* mtask_harbor.c */; };
+		79F5EFA11B84824900792868 /* mtask_lua_mysqlaux.c in Sources */ = {isa = PBXBuildFile; fileRef = 79F5EFA01B84824900792868 /* mtask_lua_mysqlaux.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -127,7 +127,6 @@
 		792E9DDA1B7DF3330078FDC9 /* lfunc.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = lfunc.h; sourceTree = "<group>"; };
 		792E9DDB1B7DF3330078FDC9 /* lgc.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = lgc.c; sourceTree = "<group>"; };
 		792E9DDC1B7DF3330078FDC9 /* lgc.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = lgc.h; sourceTree = "<group>"; };
-		792E9DDD1B7DF3330078FDC9 /* liblua.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = liblua.a; sourceTree = "<group>"; };
 		792E9DDE1B7DF3330078FDC9 /* linit.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = linit.c; sourceTree = "<group>"; };
 		792E9DDF1B7DF3330078FDC9 /* liolib.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = liolib.c; sourceTree = "<group>"; };
 		792E9DE01B7DF3330078FDC9 /* llex.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = llex.c; sourceTree = "<group>"; };
@@ -233,6 +232,7 @@
 		79DCE8CC1B78F31D002427E5 /* socket_server.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = socket_server.h; sourceTree = "<group>"; };
 		79E17CFE1B73321300491537 /* mtask_logger.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = mtask_logger.c; sourceTree = "<group>"; };
 		79E17D001B73563600491537 /* mtask_harbor.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = mtask_harbor.c; sourceTree = "<group>"; };
+		79F5EFA01B84824900792868 /* mtask_lua_mysqlaux.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = mtask_lua_mysqlaux.c; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -240,7 +240,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				792E9E151B7DF3330078FDC9 /* liblua.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -271,7 +270,6 @@
 				792E9DDA1B7DF3330078FDC9 /* lfunc.h */,
 				792E9DDB1B7DF3330078FDC9 /* lgc.c */,
 				792E9DDC1B7DF3330078FDC9 /* lgc.h */,
-				792E9DDD1B7DF3330078FDC9 /* liblua.a */,
 				792E9DDE1B7DF3330078FDC9 /* linit.c */,
 				792E9DDF1B7DF3330078FDC9 /* liolib.c */,
 				792E9DE01B7DF3330078FDC9 /* llex.c */,
@@ -339,6 +337,7 @@
 				792E9DC01B7DDD3B0078FDC9 /* mtask_lua_multicast.c */,
 				792E9DC31B7DEF470078FDC9 /* mtask_lua_mongo.c */,
 				792E9DC51B7DF0670078FDC9 /* mtask_lua_stm.c */,
+				79F5EFA01B84824900792868 /* mtask_lua_mysqlaux.c */,
 			);
 			path = "lualib-src";
 			sourceTree = SOURCE_ROOT;
@@ -537,6 +536,7 @@
 				792E9E1E1B7DF3330078FDC9 /* loslib.c in Sources */,
 				792E9E1F1B7DF3330078FDC9 /* lparser.c in Sources */,
 				792E9E161B7DF3330078FDC9 /* linit.c in Sources */,
+				79F5EFA11B84824900792868 /* mtask_lua_mysqlaux.c in Sources */,
 				798B5D811B79B4860054E773 /* mtask_lua_debugchannel.c in Sources */,
 				798B5D801B79B4860054E773 /* mtask_lua_clientsocket.c in Sources */,
 				79DCE8D51B78F31D002427E5 /* mtask_module.c in Sources */,
@@ -677,27 +677,27 @@
 		79CED6AF1B6B140D00378C7E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CONFIGURATION_BUILD_DIR = ./;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					LUA_USE_DLOPEN,
 					LPEG_DEBUG,
 					LUA_USE_POSIX,
 					LUA_DEBUG,
+					"NOUSE_JEMALLOC=1",
 				);
 				"GCC_PREPROCESSOR_DEFINITIONS[arch=*]" = (
 					LUA_USE_DLOPEN,
 					LPEG_DEBUG,
 					LUA_USE_POSIX,
 					LUA_DEBUG,
+					"NOUSE_JEMALLOC=1",
 				);
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
 					/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include,
-					"$(PROJECT_DIR)/3rd/lua",
+					./3rd/lua,
 				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/3rd/lua",
-				);
+				LIBRARY_SEARCH_PATHS = "";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -708,12 +708,9 @@
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
 					/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include,
-					"$(PROJECT_DIR)/3rd/lua",
+					./3rd/lua,
 				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/3rd/lua",
-				);
+				LIBRARY_SEARCH_PATHS = "";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;

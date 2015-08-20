@@ -25,6 +25,13 @@ logger_create(void) {
     return log;
 }
 
+void
+logger_release(struct logger *log) {
+    if (log->close) {
+        fclose(log->handle);
+    }
+    mtask_free(log);
+}
 static int
 _logger(struct mtask_context *ctx,void *ud,int type,int session, uint32_t source, const void * msg, size_t sz) {
     struct logger *log = ud;
@@ -56,10 +63,3 @@ logger_init(struct logger *log,struct mtask_context *ctx,const char *parm) {
     return 1;
 }
 
-void
-logger_release(struct logger *log) {
-    if (log->close) {
-        fclose(log->handle);
-    }
-    mtask_free(log);
-}

@@ -1,4 +1,4 @@
-local skynet = require "skynet"
+local mtask = require "mtask"
 
 local cmd = { ... }
 
@@ -34,10 +34,10 @@ local function dump_list(list)
 	end
 end
 
-skynet.start(function()
-	local list = skynet.call(".launcher","lua", unpack(cmd))
+mtask.start(function()
+	local list = mtask.call(".launcher","lua", unpack(cmd))
 	if list then
 		dump_list(list)
 	end
-	skynet.exit()
+	mtask.exit()
 end)

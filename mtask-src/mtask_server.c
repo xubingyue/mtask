@@ -172,6 +172,8 @@ mtask_context_new(const char *name,const char *parm) {
     
     CHECKCALLING_BEGIN(ctx);
     int r = mtask_module_instance_init(mod, inst, ctx, parm);
+    CHECKCALLING_END(ctx)
+
     if(r == 0) {
         struct mtask_context *ret = mtask_context_release(ctx);
         if(ret) {

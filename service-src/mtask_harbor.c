@@ -62,7 +62,7 @@ struct hashmap {
 #define STATUS_WAIT      0
 #define STATUS_HANDSHAKE 1
 #define STATUS_HEADER    2
-#define STATUS_CONNECT   3
+#define STATUS_CONTENT   3
 #define STATUS_DOWN      4
 
 struct slave {
@@ -84,29 +84,67 @@ struct harbor {
     struct slave s[REMOTE_MAX];
 };
 
-static struct hashmap *
-hash_new() {
-    struct hashmap *h = mtask_malloc(sizeof(struct hashmap));
-    memset(h, 0, sizeof(*h));
-    return h;
+//hash table
+static void
+push_queue_msg(struct harbor_msg_queue *queue,struct harbor_msg *m) {
+    if (((queue->tail +1) % queue->size) == queue->head) {
+        struct harbor_msg *new_buffer = mtask_malloc(queue->size * 2 * sizeof(struct harbor_msg));
+        int i;
+        for (i=0; i<queue->size-1; i++) {
+            new_buffer[i] = queue->data[(i+queue->head) % queue->size];
+        }
+        mtask_free(queue->data);
+        queue->data = new_buffer;
+        queue->head = 0;
+        queue->tail = queue->size -1;
+        queue->size *= 2;
+    }
+    
+    struct harbor_msg *slot = &queue->data[queue->tail];
+    *slot = *m;
+    queue->tail = (queue->tail +1) % queue->size;
 }
 
-static struct keyvalue *
-hash_insert(struct hashmap *hash,const char name[GLOBALNAME_LENGTH]) {
-    uint32_t *ptr = (uint32_t *)name;
-    uint32_t h = ptr[0] ^ ptr[1] ^ ptr[2] ^ptr[3];
+static void
+push_queue(struct harbor_msg_queue * queue, void * buffer, size_t sz, struct remote_message_header * header) {
+    struct harbor_msg m;
+    m.header = *header;
+    m.buffer = buffer;
+    m.size = sz;
+    push_queue_msg(queue, &m);
+}
 
-    struct keyvalue **pkv = &hash->node[h%HASH_SIZE];
-    struct keyvalue * node = mtask_malloc(sizeof(*node));
-    
-    memcpy(node->key, name, GLOBALNAME_LENGTH);
-    node->next = *pkv;
-    node->queue = NULL;
-    node->hash = h;
-    node->value = 0;
-    *pkv = node;
-    
-    return node;
+static struct harbor_msg *
+pop_queue(struct harbor_msg_queue *queue) {
+    if (queue->head == queue->tail) {
+        return NULL;
+    }
+    struct harbor_msg *slot = &queue->data[queue->head];
+    queue->head = (queue->head + 1) % queue->size;
+    return slot;
+}
+
+static struct harbor_msg_queue *
+new_queue() {
+    struct harbor_msg_queue *queue = mtask_malloc(sizeof(*queue));
+    queue->size = DEFAULT_QUEUE_SIZE;
+    queue->head =0;
+    queue->tail =0;
+    queue->data = mtask_malloc(DEFAULT_QUEUE_SIZE * sizeof(struct harbor_msg));
+    return queue;
+}
+
+static void
+release_queue(struct harbor_msg_queue *queue) {
+    if (queue == NULL) {
+        return;
+    }
+    struct harbor_msg *m;
+    while ((m=pop_queue(queue))) {
+        mtask_free(m->buffer);
+    }
+    mtask_free(queue->data);
+    mtask_free(queue);
 }
 
 static struct keyvalue *
@@ -124,75 +162,30 @@ hash_search(struct hashmap *hash,const char name[GLOBALNAME_LENGTH]) {
     return NULL;
 }
 
+static struct keyvalue *
+hash_insert(struct hashmap *hash,const char name[GLOBALNAME_LENGTH]) {
+    uint32_t *ptr = (uint32_t *)name;
+    uint32_t h = ptr[0] ^ ptr[1] ^ ptr[2] ^ptr[3];
+    
+    struct keyvalue **pkv = &hash->node[h%HASH_SIZE];
+    struct keyvalue * node = mtask_malloc(sizeof(*node));
+    
+    memcpy(node->key, name, GLOBALNAME_LENGTH);
+    node->next = *pkv;
+    node->queue = NULL;
+    node->hash = h;
+    node->value = 0;
+    *pkv = node;
+    
+    return node;
+}
 
-struct harbor *
-harbor_create(void) {
-    struct harbor *h = mtask_malloc(sizeof(*h));
+
+static struct hashmap *
+hash_new() {
+    struct hashmap *h = mtask_malloc(sizeof(struct hashmap));
     memset(h, 0, sizeof(*h));
-    h->map = hash_new();
     return h;
-}
-
-
-static struct harbor_msg_queue *
-new_queue() {
-    struct harbor_msg_queue *queue = mtask_malloc(sizeof(*queue));
-    queue->size = DEFAULT_QUEUE_SIZE;
-    queue->head =0;
-    queue->tail =0;
-    queue->data = mtask_malloc(DEFAULT_QUEUE_SIZE * sizeof(struct harbor_msg));
-    return queue;
-}
-
-static struct harbor_msg *
-pop_queue(struct harbor_msg_queue *queue) {
-    if (queue->head == queue->tail) {
-        return NULL;
-    }
-    struct harbor_msg *slot = &queue->data[queue->head];
-    queue->head = (queue->head + 1) % queue->size;
-    return slot;
-}
-
-static inline void
-to_bigendian(uint8_t *buffer,uint32_t n) {
-    buffer[0] = (n>>24) & 0xff;
-    buffer[1] = (n>>16) & 0xff;
-    buffer[2] = (n>>8)  & 0xff;
-    buffer[3] = n & 0xff;
-}
-
-static inline void
-header_to_message(const struct remote_message_header *header, uint8_t *message) {
-    to_bigendian(message, header->source);
-    to_bigendian(message+4, header->destination);
-    to_bigendian(message+8, header->source);
-}
-
-static void
-release_queue(struct harbor_msg_queue *queue) {
-    if (queue == NULL) {
-        return;
-    }
-    struct harbor_msg *m;
-    while ((m=pop_queue(queue))) {
-        mtask_free(m->buffer);
-    }
-    mtask_free(queue->data);
-    mtask_free(queue);
-}
-
-static void
-close_harbor(struct harbor *h,int id) {
-    struct slave *s = &h->s[id];
-    s->status = STATUS_DOWN;
-    if (s->fd) {
-        mtask_socket_close(h->ctx, s->fd);
-    }
-    if (s->queue) {
-        release_queue(s->queue);
-        s->queue = NULL;
-    }
 }
 
 static void
@@ -210,10 +203,39 @@ hash_delete(struct hashmap *hash) {
     mtask_free(hash);
 }
 
+static void
+close_harbor(struct harbor *h,int id) {
+    struct slave *s = &h->s[id];
+    s->status = STATUS_DOWN;
+    if (s->fd) {
+        mtask_socket_close(h->ctx, s->fd);
+    }
+    if (s->queue) {
+        release_queue(s->queue);
+        s->queue = NULL;
+    }
+}
+
+static void
+report_harbor_down(struct harbor *h,int id) {
+    char down[64];
+    int n = sprintf(down, "D %d",id);
+    
+    mtask_send(h->ctx, 0, h->slave, PTYPE_TEXT, 0, down, n);
+}
+
+struct harbor *
+harbor_create(void) {
+    struct harbor *h = mtask_malloc(sizeof(*h));
+    memset(h, 0, sizeof(*h));
+    h->map = hash_new();
+    return h;
+}
+
 void
 harbor_release(struct harbor *h) {
     int i;
-    for (i=0; i<REMOTE_MAX; i++) {
+    for (i=1; i<REMOTE_MAX; i++) {
         struct slave *s = &h->s[i];
         
         if (s->fd && s->status != STATUS_DOWN) {
@@ -225,37 +247,19 @@ harbor_release(struct harbor *h) {
     mtask_free(h);
 }
 
-static void
-send_remote(struct mtask_context *ctx,int fd,const char *buffer,size_t sz,struct remote_message_header *cookie) {
-    uint32_t sz_header = sz + sizeof(*cookie);
-    uint8_t *sendbuf = mtask_malloc(sz_header + 4);
-    to_bigendian(sendbuf,sz_header);
-    memcpy(sendbuf+4, buffer, sz);
-    
-    header_to_message(cookie,sendbuf+4+sz);
-    
-    /*ignore send error .because if the connection is broken,the mainloop will recv a message.*/
-    mtask_socket_send(ctx, fd, sendbuf, sz_header+4);
+static inline void
+to_bigendian(uint8_t *buffer,uint32_t n) {
+    buffer[0] = (n>>24) & 0xff;
+    buffer[1] = (n>>16) & 0xff;
+    buffer[2] = (n>>8)  & 0xff;
+    buffer[3] = n & 0xff;
 }
 
-static void
-dispatch_queue(struct harbor *h,int id) {
-    struct slave *s = &h->s[id];
-    int fd = s->fd;
-    assert(fd != 0);
-    
-    struct harbor_msg_queue *queue = s->queue;
-    if (queue == NULL) {
-        return;
-    }
-    
-    struct harbor_msg *m;
-    while ((m=pop_queue(queue)) != NULL) {
-        send_remote(h->ctx, fd, m->buffer, m->size, &m->header);
-        mtask_free(queue);
-    }
-    release_queue(queue);
-    s->queue = NULL;
+static inline void
+header_to_message(const struct remote_message_header *header, uint8_t *message) {
+    to_bigendian(message, header->source);
+    to_bigendian(message+4, header->destination);
+    to_bigendian(message+8, header->session);
 }
 
 static inline uint32_t
@@ -295,6 +299,40 @@ forward_local_message(struct harbor *h,void *msg,int sz) {
 }
 
 static void
+send_remote(struct mtask_context * ctx, int fd, const char * buffer, size_t sz, struct remote_message_header * cookie) {
+    uint32_t sz_header = sz+sizeof(*cookie);
+    uint8_t * sendbuf = mtask_malloc(sz_header+4);
+    to_bigendian(sendbuf, sz_header);
+    memcpy(sendbuf+4, buffer, sz);
+    header_to_message(cookie, sendbuf+4+sz);
+    
+    // ignore send error, because if the connection is broken, the mainloop will recv a message.
+    mtask_socket_send(ctx, fd, sendbuf, sz_header+4);
+}
+
+
+static void
+dispatch_queue(struct harbor *h,int id) {
+    struct slave *s = &h->s[id];
+    int fd = s->fd;
+    assert(fd != 0);
+    
+    struct harbor_msg_queue *queue = s->queue;
+    if (queue == NULL) {
+        return;
+    }
+    
+    struct harbor_msg *m;
+    while ((m=pop_queue(queue)) != NULL) {
+        send_remote(h->ctx, fd, m->buffer, m->size, &m->header);
+        mtask_free(queue);
+    }
+    release_queue(queue);
+    s->queue = NULL;
+}
+
+
+static void
 push_socket_data(struct harbor *h,const struct mtask_socket_message *message) {
     assert(message->type == MTASK_SOCKET_TYPE_DATA);
     int fd = message->id;
@@ -304,7 +342,7 @@ push_socket_data(struct harbor *h,const struct mtask_socket_message *message) {
     for (i=1; i<REMOTE_MAX; i++) {
         if (h->s[i].fd == fd) {
             s= &h->s[i];
-            id=1;
+            id=i;
             break;
         }
     }
@@ -360,13 +398,13 @@ push_socket_data(struct harbor *h,const struct mtask_socket_message *message) {
                     s->length = s->size[1] << 16 | s->size[2] << 8 | s->size[3];
                     s->read = 0;
                     s->recv_buffer =mtask_malloc(s->length);
-                    s->status = STATUS_CONNECT;
+                    s->status = STATUS_CONTENT;
                     if (size ==0) {
                         return;
                     }
                 }
             }
-            case STATUS_CONNECT: {
+            case STATUS_CONTENT: {
                 int need = s->length - s->read;
                 if (size < need) {
                     memcpy(s->recv_buffer+ s->read, buffer,size);
@@ -389,62 +427,20 @@ push_socket_data(struct harbor *h,const struct mtask_socket_message *message) {
             }
                 
             default:
-                break;
+                return;
         }
     }
 }
 
 
 
-//hash table
-static void
-push_queue_msg(struct harbor_msg_queue *queue,struct harbor_msg *m) {
-    if (((queue->tail +1) % queue->size) == queue->head) {
-        struct harbor_msg *new_buffer = mtask_malloc(sizeof(queue->size * 2 * sizeof(struct harbor_msg)));
-        int i;
-        for (i=0; i<queue->size-1; i++) {
-            new_buffer[i] = queue->data[(i+queue->head) % queue->size];
-        }
-        mtask_free(queue->data);
-        queue->data = new_buffer;
-        queue->head = 0;
-        queue->tail = queue->size -1;
-        queue->size *= 2;
-    }
-    
-    struct harbor_msg *slot = &queue->data[queue->tail];
-    *slot = *m;
-    queue->tail = (queue->tail +1) % queue->size;
-}
 
-static void
-push_queue(struct harbor_msg_queue * queue, void * buffer, size_t sz, struct remote_message_header * header) {
-    struct harbor_msg m;
-    m.header = *header;
-    m.buffer = buffer;
-    m.size = sz;
-    push_queue_msg(queue, &m);
-}
 
-static int
-harbor_id(struct harbor *h,int fd) {
-    int i ;
-    for (i=0; i<REMOTE_MAX; i++) {
-        struct slave *s = &h->s[i];
-        if (s->fd == fd) {
-            return i;
-        }
-    }
-    return 0;
-}
 
-static void
-report_harbor_down(struct harbor *h,int id) {
-    char down[64];
-    int n = sprintf(down, "D %d",id);
-    
-    mtask_send(h->ctx, 0, h->slave, PTYPE_TEXT, 0, down, n);
-}
+
+
+
+
 
 static void
 dispatch_name_queue(struct harbor *h,struct keyvalue *node) {
@@ -546,7 +542,7 @@ harbor_command(struct harbor *h ,const char *msg,size_t sz, int session, uint32_
             slave->fd = fd;
             
             mtask_socket_start(h->ctx, fd);
-            handshake(h, fd);
+            handshake(h, id);
         
             if (msg[0] == 'S') {
                 slave->status = STATUS_HANDSHAKE;
@@ -558,10 +554,9 @@ harbor_command(struct harbor *h ,const char *msg,size_t sz, int session, uint32_
         }
         default:
             mtask_error(h->ctx, "Unknown command %s",msg);
-            break;
+            return;
     }
 }
-
 static int
 remote_send_handle(struct harbor *h,uint32_t source ,uint32_t dst,int type,int session,
                    const char *msg, size_t sz) {
@@ -585,7 +580,7 @@ remote_send_handle(struct harbor *h,uint32_t source ,uint32_t dst,int type,int s
             }
             struct remote_message_header header;
             header.source = source;
-            header.destination = (type << HANDLE_REMOTE_SHIFT);
+            header.destination = (type << HANDLE_REMOTE_SHIFT) | (dst & HANDLE_MASK);
             header.session = (uint32_t)session;
             
             push_queue(s->queue, (void*)msg, sz, &header);
@@ -602,7 +597,6 @@ remote_send_handle(struct harbor *h,uint32_t source ,uint32_t dst,int type,int s
     }
     return 0;
 }
-
 static int
 remote_send_name(struct harbor *h,uint32_t source,const char name[GLOBALNAME_LENGTH], int type, int session, const char * msg, size_t sz) {
     struct keyvalue *node = hash_search(h->map,name);
@@ -629,6 +623,21 @@ remote_send_name(struct harbor *h,uint32_t source,const char name[GLOBALNAME_LEN
         return remote_send_handle(h, source, node->value, type, session, msg, sz);
     }
 }
+
+static int
+harbor_id(struct harbor *h,int fd) {
+    int i ;
+    for (i=1; i<REMOTE_MAX; i++) {
+        struct slave *s = &h->s[i];
+        if (s->fd == fd) {
+            return i;
+        }
+    }
+    return 0;
+}
+
+
+
 
 static int
 mainloop(struct mtask_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {

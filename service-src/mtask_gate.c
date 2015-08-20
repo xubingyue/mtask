@@ -53,10 +53,30 @@ gate_create(void) {
     return g;
 }
 
+void
+gate_release(struct gate *g) {
+    int i;
+    struct mtask_context *ctx = g->ctx;
+    for (i=0;i<g->max_connection;i++) {
+        struct connection *c = &g->conn[i];
+        if (c->id >=0) {
+            mtask_socket_close(ctx, c->id);
+        }
+    }
+    if (g->listen_id >= 0) {
+        mtask_socket_close(ctx, g->listen_id);
+    }
+    messagepool_free(&g->mp);
+    hashid_clear(&g->hash);
+    mtask_free(g->conn);
+    mtask_free(g);
+}
+
+
 static void
 _parm(char *msg,int sz,int command_sz) {
     while (command_sz <sz) {
-        if (msg[command_sz != ' ']) {
+        if (msg[command_sz] != ' ') {
             break;
         }
         ++command_sz;
@@ -123,7 +143,7 @@ _ctrl(struct gate *g,const void *msg,int sz) {
         }
         uint32_t agent_handle = strtoul(agent+1, NULL, 16);
         uint32_t client_handle = strtoul(client+1, NULL, 16);
-        _forward_agent(g, idstr, agent_handle, client_handle);
+        _forward_agent(g, id, agent_handle, client_handle);
         return;
     }
     
@@ -149,6 +169,23 @@ _ctrl(struct gate *g,const void *msg,int sz) {
 }
 
 static void
+_report(struct gate*g,const char *data,...) {
+    if (g->watchdog==0) {
+        return;
+    }
+    struct mtask_context *ctx = g->ctx;
+    va_list ap;
+    va_start(ap, data);
+
+    char tmp[1024];
+    int n= vsnprintf(tmp, sizeof(tmp), data , ap);
+    va_end(ap);
+    
+    mtask_send(ctx, 0, g->watchdog, PTYPE_TEXT, 0, tmp, n);
+}
+
+
+static void
 _forward(struct gate *g ,struct connection *c, int size) {
     struct mtask_context *ctx = g->ctx;
     if (g->broker) {
@@ -160,6 +197,7 @@ _forward(struct gate *g ,struct connection *c, int size) {
     
     if (c->agent) {
         void *tmp = mtask_malloc(size);
+		databuffer_read(&c->buffer,&g->mp,tmp, size);
         mtask_send(ctx, c->client, c->agent, g->client_tag | PTYPE_TAG_DONT_COPY, 0, tmp, size);
     } else if(g->watchdog) {
         char *tmp = mtask_malloc(size+32);
@@ -193,21 +231,6 @@ dispatch_message(struct gate *g,struct connection *c,int id ,void*data,int sz) {
     }
 }
 
-static void
-_report(struct gate*g,const char *data,...) {
-    if (g->watchdog==0) {
-        return;
-    }
-    struct mtask_context *ctx = g->ctx;
-    va_list ap;
-    va_start(ap, data);
-
-    char tmp[1024];
-    int n= vsnprintf(tmp, sizeof(tmp), data , ap);
-    va_end(ap);
-    
-    mtask_send(ctx, 0, g->watchdog, PTYPE_TEXT, 0, tmp, n);
-}
 
 static void
 dispatch_socket_message(struct gate *g,const struct mtask_socket_message *message,int sz) {
@@ -217,7 +240,7 @@ dispatch_socket_message(struct gate *g,const struct mtask_socket_message *messag
             int id = hashid_lookup(&g->hash, message->id);
             if (id>=0) {
                 struct connection *c = &g->conn[id];
-                dispatch_message(g, c, message->id, message->buffer, sz);
+                dispatch_message(g, c, message->id, message->buffer, message->ud);
             } else {
                 mtask_error(ctx, "Drop unknow connection %d message",message->id);
                 mtask_socket_close(ctx, message->id);
@@ -339,7 +362,7 @@ start_listen(struct gate *g ,char *listen_addr) {
 }
 
 int
-gate_init(struct gate *g,struct mtask_context *ctx,const char *parm) {
+gate_init(struct gate *g,struct mtask_context *ctx,char *parm) {
     if (parm==NULL) {
         return 1;
     }
@@ -397,18 +420,3 @@ gate_init(struct gate *g,struct mtask_context *ctx,const char *parm) {
     
     return start_listen(g,binding);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

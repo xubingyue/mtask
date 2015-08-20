@@ -52,11 +52,11 @@ MTASK_SRC = mtask_main.c mtask_handle.c mtask_module.c mtask_mq.c \
   malloc_hook.c mtask_daemon.c mtask_log.c
 
 all : \
-  $(MTASK__BUILD_PATH)/mtask \
+  $(MTASK_BUILD_PATH)/mtask \
   $(foreach v, $(CSERVICE), $(CSERVICE_PATH)/$(v).so) \
   $(foreach v, $(LUA_CLIB), $(LUA_CLIB_PATH)/$(v).so) 
 
-$(MTASK__BUILD_PATH)/mtask : $(foreach v, $(MTASK__SRC), mtask-src/$(v)) $(LUA_LIB) $(MALLOC_STATICLIB)
+$(MTASK_BUILD_PATH)/mtask : $(foreach v, $(MTASK_SRC), mtask-src/$(v)) $(LUA_LIB) $(MALLOC_STATICLIB)
 	$(CC) $(CFLAGS) -o $@ $^ -Imtask-src -I$(JEMALLOC_INC) $(LDFLAGS) $(EXPORT) $(MTASK_LIBS) $(MTASK_DEFINES)
 
 $(LUA_CLIB_PATH) :
@@ -66,52 +66,52 @@ $(CSERVICE_PATH) :
 	mkdir $(CSERVICE_PATH)
 
 define CSERVICE_TEMP
-  $$(CSERVICE_PATH)/$(1).so : service-src/service_$(1).c | $$(CSERVICE_PATH)
+  $$(CSERVICE_PATH)/$(1).so : service-src/mtask_$(1).c | $$(CSERVICE_PATH)
 		$$(CC) $$(CFLAGS) $$(SHARED) $$< -o $$@ -Imtask-src
 endef
 
 $(foreach v, $(CSERVICE), $(eval $(call CSERVICE_TEMP,$(v))))
 
-$(LUA_CLIB_PATH)/mtask.so : lualib-src/lua-mtask.c lualib-src/lua-seri.c | $(LUA_CLIB_PATH)
+$(LUA_CLIB_PATH)/mtask.so : lualib-src/mtask_lua_mtask.c lualib-src/mtask_lua_seri.c | $(LUA_CLIB_PATH)
 		$(CC) $(CFLAGS) $(SHARED) $^ -o $@ -Imtask-src -Iservice-src -Ilualib-src
 
-$(LUA_CLIB_PATH)/socketdriver.so : lualib-src/lua-socket.c | $(LUA_CLIB_PATH)
+$(LUA_CLIB_PATH)/socketdriver.so : lualib-src/mtask_lua_socket.c | $(LUA_CLIB_PATH)
 		$(CC) $(CFLAGS) $(SHARED) $^ -o $@ -Imtask-src -Iservice-src
 
-$(LUA_CLIB_PATH)/bson.so : lualib-src/lua-bson.c | $(LUA_CLIB_PATH)
+$(LUA_CLIB_PATH)/bson.so : lualib-src/mtask_lua_bson.c | $(LUA_CLIB_PATH)
 		$(CC) $(CFLAGS) $(SHARED) $^ -o $@ -Imtask-src
 
-$(LUA_CLIB_PATH)/mongo.so : lualib-src/lua-mongo.c | $(LUA_CLIB_PATH)
+$(LUA_CLIB_PATH)/mongo.so : lualib-src/mtask_lua_mongo.c | $(LUA_CLIB_PATH)
 		$(CC) $(CFLAGS) $(SHARED) $^ -o $@ -Imtask-src
 
 $(LUA_CLIB_PATH)/md5.so : 3rd/lua-md5/md5.c 3rd/lua-md5/md5lib.c 3rd/lua-md5/compat-5.2.c | $(LUA_CLIB_PATH)
 		$(CC) $(CFLAGS) $(SHARED) -I3rd/lua-md5 $^ -o $@ 
 
-$(LUA_CLIB_PATH)/netpack.so : lualib-src/lua-netpack.c | $(LUA_CLIB_PATH)
+$(LUA_CLIB_PATH)/netpack.so : lualib-src/mtask_lua_netpack.c | $(LUA_CLIB_PATH)
 		$(CC) $(CFLAGS) $(SHARED) $^ -Imtask-src -o $@ 
 
-$(LUA_CLIB_PATH)/clientsocket.so : lualib-src/lua-clientsocket.c | $(LUA_CLIB_PATH)
+$(LUA_CLIB_PATH)/clientsocket.so : lualib-src/mtask_lua_clientsocket.c | $(LUA_CLIB_PATH)
 		$(CC) $(CFLAGS) $(SHARED) $^ -o $@ -lpthread
 
-$(LUA_CLIB_PATH)/memory.so : lualib-src/lua-memory.c | $(LUA_CLIB_PATH)
+$(LUA_CLIB_PATH)/memory.so : lualib-src/mtask_lua_memory.c | $(LUA_CLIB_PATH)
 		$(CC) $(CFLAGS) $(SHARED) -Imtask-src $^ -o $@ 
 
-$(LUA_CLIB_PATH)/profile.so : lualib-src/lua-profile.c | $(LUA_CLIB_PATH)
+$(LUA_CLIB_PATH)/profile.so : lualib-src/mtask_lua_profile.c | $(LUA_CLIB_PATH)
 		$(CC) $(CFLAGS) $(SHARED) $^ -o $@ 
 
-$(LUA_CLIB_PATH)/multicast.so : lualib-src/lua-multicast.c | $(LUA_CLIB_PATH)
+$(LUA_CLIB_PATH)/multicast.so : lualib-src/mtask_lua_multicast.c | $(LUA_CLIB_PATH)
 		$(CC) $(CFLAGS) $(SHARED) -Imtask-src $^ -o $@ 
 
-$(LUA_CLIB_PATH)/cluster.so : lualib-src/lua-cluster.c | $(LUA_CLIB_PATH)
+$(LUA_CLIB_PATH)/cluster.so : lualib-src/mtask_lua_cluster.c | $(LUA_CLIB_PATH)
 		$(CC) $(CFLAGS) $(SHARED) -Imtask-src $^ -o $@ 
 
-$(LUA_CLIB_PATH)/crypt.so : lualib-src/lua-crypt.c lualib-src/lsha1.c | $(LUA_CLIB_PATH)
+$(LUA_CLIB_PATH)/crypt.so : lualib-src/mtask_lua_crypt.c lualib-src/lsha1.c | $(LUA_CLIB_PATH)
 		$(CC) $(CFLAGS) $(SHARED) $^ -o $@ 
 
-$(LUA_CLIB_PATH)/sharedata.so : lualib-src/lua-sharedata.c | $(LUA_CLIB_PATH)
+$(LUA_CLIB_PATH)/sharedata.so : lualib-src/mtask_lua_sharedata.c | $(LUA_CLIB_PATH)
 		$(CC) $(CFLAGS) $(SHARED) $^ -o $@ 
 
-$(LUA_CLIB_PATH)/stm.so : lualib-src/lua-stm.c | $(LUA_CLIB_PATH)
+$(LUA_CLIB_PATH)/stm.so : lualib-src/mtask_lua_stm.c | $(LUA_CLIB_PATH)
 		$(CC) $(CFLAGS) $(SHARED) -Imtask-src $^ -o $@ 
 
 $(LUA_CLIB_PATH)/sproto.so : lualib-src/sproto/sproto.c lualib-src/sproto/lsproto.c | $(LUA_CLIB_PATH)
@@ -119,11 +119,11 @@ $(LUA_CLIB_PATH)/sproto.so : lualib-src/sproto/sproto.c lualib-src/sproto/lsprot
 
 $(LUA_CLIB_PATH)/lpeg.so : 3rd/lpeg/lpcap.c 3rd/lpeg/lpcode.c 3rd/lpeg/lpprint.c 3rd/lpeg/lptree.c 3rd/lpeg/lpvm.c | $(LUA_CLIB_PATH)
 		$(CC) $(CFLAGS) $(SHARED) -I3rd/lpeg $^ -o $@ 
-
-$(LUA_CLIB_PATH)/mysqlaux.so : lualib-src/lua-mysqlaux.c | $(LUA_CLIB_PATH)
+										  
+$(LUA_CLIB_PATH)/mysqlaux.so : lualib-src/mtask_lua_mysqlaux.c | $(LUA_CLIB_PATH)
 		$(CC) $(CFLAGS) $(SHARED) $^ -o $@
 
-$(LUA_CLIB_PATH)/debugchannel.so : lualib-src/lua-debugchannel.c | $(LUA_CLIB_PATH)
+$(LUA_CLIB_PATH)/debugchannel.so : lualib-src/mtask_lua_debugchannel.c | $(LUA_CLIB_PATH)
 		$(CC) $(CFLAGS) $(SHARED) $^ -o $@
 
 clean :

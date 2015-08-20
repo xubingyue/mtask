@@ -132,8 +132,12 @@ mtask_module_insert(struct mtask_module *mod) {
 /*create  Lua module callback function */
 void *
 mtask_module_instance_create(struct mtask_module*m) {
-    if(m->create) return m->create();
-    else return (void *)(intptr_t)(~0);
+    if(m->create){
+       return m->create();
+    }
+    else{
+        return (void *)(intptr_t)(~0);
+    }
 }
 /*init  Lua module callback function */
 int
