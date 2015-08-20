@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include "atomic.h"
+#include "mtask_atomic.h"
 
 #define DEFAULT_CAP 64
 #define MAX_NUMBER 1024

@@ -51,7 +51,7 @@ write_pid(const char *pidfile) {
     
     f = fdopen(fd, "r+");
     if(f == NULL) {
-        fprintf(stderr, "Can't open %s .\n",pidfile);
+        fprintf(stderr, "Can't open %s.\n",pidfile);
         return 0;
     }
     
@@ -59,7 +59,7 @@ write_pid(const char *pidfile) {
         int n = fscanf(f, "%d",&pid);
         fclose(f);
         if(n != 1) {
-            fprintf(stderr, "Can't lock and read pidfile .\n");
+            fprintf(stderr, "Can't lock and read pidfile.\n");
         } else {
             fprintf(stderr, "Can't lock pidfile, lock is held by pid %d.\n", pid);
         }
@@ -68,7 +68,7 @@ write_pid(const char *pidfile) {
     
     pid  = getpid();
     
-    if(!fprintf(stderr, "%d\n",pid)) {
+    if(!fprintf(f, "%d\n",pid)) {
         fprintf(stderr, "Can't write pid.\n");
         close(fd);
         return 0;

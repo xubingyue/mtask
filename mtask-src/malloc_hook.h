@@ -10,6 +10,7 @@
 #define __mtask__malloc_hook__
 
 #include <stdlib.h>
+#include <lua.h>
 
 extern size_t malloc_used_memory(void);
 
@@ -23,5 +24,6 @@ extern int mallctl_opt(const char *name,int *newval);
 
 extern void dump_c_mem(void);
 
+extern int    dump_mem_lua(lua_State *L);
 
 #endif /* defined(__mtask__malloc_hook__) */

@@ -8,7 +8,7 @@
 
 #ifndef __mtask__rwlock__
 #define __mtask__rwlock__
-
+#ifndef USE_PTHREAD_LOCK
 
 struct rwlock {
     int write;
@@ -68,6 +68,43 @@ rwlock_runlock(struct rwlock *lock) {
     __sync_sub_and_fetch(&lock->read,1);
 }
 
+#else
+
+#include <pthread.h>
+
+// only for some platform doesn't have __sync_*
+// todo: check the result of pthread api
+
+struct rwlock {
+	pthread_rwlock_t lock;
+};
+
+static inline void
+rwlock_init(struct rwlock *lock) {
+	pthread_rwlock_init(&lock->lock, NULL);
+}
+
+static inline void
+rwlock_rlock(struct rwlock *lock) {
+	 pthread_rwlock_rdlock(&lock->lock);
+}
+
+static inline void
+rwlock_wlock(struct rwlock *lock) {
+	 pthread_rwlock_wrlock(&lock->lock);
+}
+
+static inline void
+rwlock_wunlock(struct rwlock *lock) {
+	pthread_rwlock_unlock(&lock->lock);
+}
+
+static inline void
+rwlock_runlock(struct rwlock *lock) {
+	pthread_rwlock_unlock(&lock->lock);
+}
+
+#endif
 
 
 
