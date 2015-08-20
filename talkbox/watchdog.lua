@@ -1,5 +1,5 @@
 --watchdog.lua
-local skynet = require "skynet"
+local mtask = require "mtask"
 local netpack = require "netpack"
 
 local CMD = {}
@@ -9,9 +9,9 @@ local agent = {}
 
 
 function SOCKET.open(fd,addr)
-	agentp[fd] = skynet.newservice("agent")
-	skynet.call(agent[fd],"lua","start",gate,fd)
-	skynet.call(agent[fd],"xfs","start a new agent")
+	agentp[fd] = mtask.newservice("agent")
+	mtask.call(agent[fd],"lua","start",gate,fd)
+	mtask.call(agent[fd],"xfs","start a new agent")
 end
 
 function SOCKET.close(fd)
@@ -31,37 +31,37 @@ end
 function close_agent()
 	local a = agent[fd]
 	if a then 
-		skynet.kill(a)
+		mtask.kill(a)
 		agent[fd] = nil
-		ok,result = pcall(skynet.call,"talkbox","lua","rmUser",fd) -- 断开链接是处理用户
+		ok,result = pcall(mtask.call,"talkbox","lua","rmUser",fd) -- 断开链接是处理用户
 		
 	end
 end
 
 -- test   注册新的lua协议
-skynet.register_protocol {
+mtask.register_protocol {
     	name = "xfs",
 		id = 12,
-		pack = skynet.pack,
-		unpack = skynet.unpack,
+		pack = mtask.pack,
+		unpack = mtask.unpack,
 }
 
 
 function CMD.start(conf)
-	skynet.call(gate,"lua","open",conf)
+	mtask.call(gate,"lua","open",conf)
 end
 
 
-skynet.start(function()
-	skynet.dispatch("lua",function(session,source,cmd,subcmd,...) 
+mtask.start(function()
+	mtask.dispatch("lua",function(session,source,cmd,subcmd,...) 
 			if cmd == "socket" then
 				local f  = SOCKET[subcmd]
 				f(...)
 			else
 				local f = assert(CMD[cmd])
-				skynet.ret(skynet.pack(f(subcmd,...)))
+				mtask.ret(mtask.pack(f(subcmd,...)))
 			
 			end		
 	end)
-	gate = skynet.newservice("gate")
+	gate = mtask.newservice("gate")
 end)

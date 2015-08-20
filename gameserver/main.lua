@@ -1,20 +1,20 @@
-local skynet = require "skynet"
+local mtask = require "mtask"
 
 local max_client = 64
 
 local server_port = 8888
 
-skynet.start(function() 
+mtask.start(function() 
 	print("server start...")
-	local console = skynet.newservice("console")
-	skynet.newservice("debug_console",8000)
-	skynet.newservice("heartbeat")
-	local watchdog = skynet.newservice("watchdog")
-	skynet.call(watchdog,"lua","start",{
+	local console = mtask.newservice("console")
+	mtask.newservice("debug_console",8000)
+	mtask.newservice("heartbeat")
+	local watchdog = mtask.newservice("watchdog")
+	mtask.call(watchdog,"lua","start",{
 		port = server_port,
 		max_client = max_client,
 		nodelay = true,
 	})
 	print("watchdog listen on: ", server_port)
-	skynet.exit()
+	mtask.exit()
 end)

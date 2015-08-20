@@ -1,4 +1,4 @@
-local skynet = require "skynet"
+local mtask = require "mtask"
 local mysql = require "mysql"
 
 local function dump(obj)
@@ -53,7 +53,7 @@ local function test2( db)
         res = db:query("select * from cats order by id asc")
         print ( "test2 loop times=" ,i,"\n","query result=",dump( res ) )
 
-        skynet.sleep(1000)
+        mtask.sleep(1000)
         i=i+1
     end
 end
@@ -64,16 +64,16 @@ local function test3( db)
         print ( "test3 loop times=" ,i,"\n","query result=",dump( res ) )
         res = db:query("select * from cats order by id asc")
         print ( "test3 loop times=" ,i,"\n","query result=",dump( res ) )
-        skynet.sleep(1000)
+        mtask.sleep(1000)
         i=i+1
     end
 end
-skynet.start(function()
+mtask.start(function()
 
 	local db=mysql.connect{
 		host="127.0.0.1",
 		port=3306,
-		database="skynet",
+		database="mtask",
 		user="root",
 		password="1",
 		max_packet_size = 1024 * 1024
@@ -98,8 +98,8 @@ skynet.start(function()
 	print ( dump( res ) )
 
     -- test in another coroutine
-	skynet.fork( test2, db)
-    skynet.fork( test3, db)
+	mtask.fork( test2, db)
+    mtask.fork( test3, db)
 	-- multiresultset test
 	res = db:query("select * from cats order by id asc ; select * from cats")
 	print ("multiresultset test result=", dump( res ) )
@@ -119,11 +119,11 @@ skynet.start(function()
         print ( "test1 loop times=" ,i,"\n","query result=",dump( res ) )
 
 
-        skynet.sleep(1000)
+        mtask.sleep(1000)
         i=i+1
     end
 
 	--db:disconnect()
-	--skynet.exit()
+	--mtask.exit()
 end)
 

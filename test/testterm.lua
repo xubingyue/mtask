@@ -1,15 +1,15 @@
-local skynet = require "skynet"
+local mtask = require "mtask"
 
 local function term()
-	skynet.error("Sleep one second, and term the call to UNEXIST")
-	skynet.sleep(100)
-	local self = skynet.self()
-	skynet.send(skynet.self(), "debug", "TERM", "UNEXIST")
+	mtask.error("Sleep one second, and term the call to UNEXIST")
+	mtask.sleep(100)
+	local self = mtask.self()
+	mtask.send(mtask.self(), "debug", "TERM", "UNEXIST")
 end
 
-skynet.start(function()
-	skynet.fork(term)
-	skynet.error("call an unexist named service UNEXIST, may block")
-	pcall(skynet.call, "UNEXIST", "lua", "test")
-	skynet.error("unblock the unexisted service call")
+mtask.start(function()
+	mtask.fork(term)
+	mtask.error("call an unexist named service UNEXIST, may block")
+	pcall(mtask.call, "UNEXIST", "lua", "test")
+	mtask.error("unblock the unexisted service call")
 end)

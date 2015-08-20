@@ -1,11 +1,3 @@
-//
-//  mtask_lua_bson.c
-//  mtask
-//
-//  Created by TTc on 14/8/11.
-//  Copyright (c) 2015年 TTc. All rights reserved.
-//
-
 #include <lua.h>
 #include <lauxlib.h>
 
@@ -16,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include "atomic.h"
 
 #define DEFAULT_CAP 64
 #define MAX_NUMBER 1024
@@ -205,7 +198,7 @@ write_length(struct bson *b, int32_t v, int off) {
 
 static void
 write_string(struct bson *b, const char *key, size_t sz) {
-    bson_reserve(b,(int)sz+1);
+    bson_reserve(b,sz+1);
     memcpy(b->ptr + b->size, key, sz);
     b->ptr[b->size+sz] = '\0';
     b->size+=sz+1;
@@ -1148,15 +1141,15 @@ lobjectid(lua_State *L) {
     } else {
         time_t ti = time(NULL);
         // old_counter is a static var, use atom inc.
-        uint32_t id = __sync_fetch_and_add(&oid_counter,1);
+        uint32_t id = ATOM_FINC(&oid_counter);
         
         oid[2] = (ti>>24) & 0xff;
         oid[3] = (ti>>16) & 0xff;
         oid[4] = (ti>>8) & 0xff;
         oid[5] = ti & 0xff;
         memcpy(oid+6 , oid_header, 5);
-        oid[11] = (id>>16) & 0xff;
-        oid[12] = (id>>8) & 0xff;
+        oid[11] = (id>>16) & 0xff; 
+        oid[12] = (id>>8) & 0xff; 
         oid[13] = id & 0xff;
     }
     lua_pushlstring( L, (const char *)oid, 14);
@@ -1202,4 +1195,3 @@ luaopen_bson(lua_State *L) {
     
     return 1;
 }
-

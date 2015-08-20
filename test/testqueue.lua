@@ -1,9 +1,9 @@
-local skynet = require "skynet"
+local mtask = require "mtask"
 local snax = require "snax"
 
-skynet.start(function()
-	--print("self===>",skynet.self())
-	skynet.error(string.format("[self ]address is[:%x]",  skynet.self()))
+mtask.start(function()
+	--print("self===>",mtask.self())
+	mtask.error(string.format("[self ]address is[:%x]",  mtask.self()))
 
 	local ps = snax.uniqueservice ("pingserver", "test queue")
 	for i=1, 10 do
@@ -15,7 +15,7 @@ skynet.start(function()
 		ps.post.hello()
 	end
  
-	skynet.exit()
+	mtask.exit()
 end)
 
 

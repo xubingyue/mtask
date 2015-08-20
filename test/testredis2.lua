@@ -1,4 +1,4 @@
-local skynet = require "skynet"
+local mtask = require "mtask"
 local redis  = require "redis"
 
 local db
@@ -49,5 +49,5 @@ function __init__()
     print("redistest launched")
 end
 
-skynet.start(__init__)
+mtask.start(__init__)
 

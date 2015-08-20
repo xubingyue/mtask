@@ -1,5 +1,5 @@
 ---rent_redis.lua  
-local skynet = require "skynet"
+local mtask = require "mtask"
 local redis  = require "redis"
 
 
@@ -19,9 +19,9 @@ local function watching()
 end
 
 
-skynet.start(function()
+mtask.start(function()
 	print("rent_redis call.... ...")
-	skynet.fork(watching)
+	mtask.fork(watching)
 	local db = redis:connect(conf)
 	if not db then 
 		print("fail connect to redis db ...")

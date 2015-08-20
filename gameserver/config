@@ -14,4 +14,4 @@ lualoader = root.."lualib/loader.lua"
 -- preload = "./examples/preload.lua"	-- run preload.lua before every lua service run
 snax = root.."gameserver/?.lua;"
 cpath = root.."cservice/?.so"
--- daemon = "./skynet.pid"
+-- daemon = "./mtask.pid"

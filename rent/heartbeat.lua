@@ -3,7 +3,7 @@
 
 package.path = "lualib/?.lua;rent/?.lua"
 
-local skynet	= require "skynet"
+local mtask	= require "mtask"
 local netpack	= require "netpack"
 local socket	= require "socket"
 local packdeal  = require "packdeal"
@@ -17,10 +17,10 @@ function CMD.heartbeat_deal(client_fd, req_msg)
 	packdeal.send_package(client_fd, ack)
 end
 
-skynet.start(function()
-	skynet.dispatch("lua", function(session, address, cmd, ...)
+mtask.start(function()
+	mtask.dispatch("lua", function(session, address, cmd, ...)
 		local f = CMD[cmd]
 		f(...)
 	end)
-	skynet.register "heartbeat"
+	mtask.register "heartbeat"
 end)

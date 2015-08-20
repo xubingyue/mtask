@@ -1,7 +1,7 @@
 --watchdog.lua  in  rent
 package.path  = "./rent/?.lua;" .. package.path
 
-local skynet  = require "skynet"
+local mtask  = require "mtask"
 local netpack = require "netpack"
 
 local CMD = {}
@@ -11,50 +11,50 @@ local agent={}
 
 
 function SOCKET.open(fd,addr)
-    skynet.error("new client from :"..addr)	
-	agent[fd] = skynet.newservice("agent")
-	skynet.call(agent[fd],"lua","start",gate,fd)
+    mtask.error("new client from :"..addr)	
+	agent[fd] = mtask.newservice("agent")
+	mtask.call(agent[fd],"lua","start",gate,fd)
 end
 
 local function close_agent(fd)
 	local a = agent[fd]
 	if a then 
-		skynet.kill(a)
+		mtask.kill(a)
 		agent[fd] = nil
 	end
 end
 
 function SOCKET.close(fd)
-	skynet.error(string.format("socket close: =>"..fd))
+	mtask.error(string.format("socket close: =>"..fd))
 	close_agent(fd)
 end
 
 function SOCKET.error(fd)
-	skynet.error(string.format("socket error: =>"..fd))
+	mtask.error(string.format("socket error: =>"..fd))
   	close_agent(fd)	
 end
 
 function SOCKET.data(fd,msg)
-	skynet.error(string.format("socket date: =>"..fd..msg))
+	mtask.error(string.format("socket date: =>"..fd..msg))
 end
 
 function CMD.start(conf)
-	skynet.call(gate,"lua","open",conf)
+	mtask.call(gate,"lua","open",conf)
 end
 
-skynet.start(function()  
-	skynet.error(string.format("watchdog  start..."))
-	skynet.dispatch("lua",function(session,source,cmd,subcmd,...) 
-		--skynet.error(string.format(session..source..cmd..subcmd..(...)))
+mtask.start(function()  
+	mtask.error(string.format("watchdog  start..."))
+	mtask.dispatch("lua",function(session,source,cmd,subcmd,...) 
+		--mtask.error(string.format(session..source..cmd..subcmd..(...)))
 		if cmd == "socket" then
 		    local f = SOCKET[subcmd]	
 			f(...)
 			-- socket api don't need return  
 		else
 			local f  = assert(CMD[cmd])
-			skynet.ret(skynet.pack(f(subcmd,...)))
+			mtask.ret(mtask.pack(f(subcmd,...)))
 		end
 	end)
-	gate = skynet.newservice("gate")
+	gate = mtask.newservice("gate")
 end)
 

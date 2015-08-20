@@ -1,7 +1,7 @@
 --watchdog.lua
 package.path = "./gameserver/?.lua;" .. package.path
 
-local skynet = require "skynet"
+local mtask = require "mtask"
 local netpack = require "netpack"
 
 local CMD = {}
@@ -11,9 +11,9 @@ local agent={}
 
 
 function SOCKET.open(fd,addr)
-    skynet.error("new client from :"..addr)	agent[fd] = skynet.newservice("agent")
+    mtask.error("new client from :"..addr)	agent[fd] = mtask.newservice("agent")
 
-	skynet.call(agent[fd],"lua","start",gate,fd)
+	mtask.call(agent[fd],"lua","start",gate,fd)
 end
 
 
@@ -21,7 +21,7 @@ end
 local function close_agent(fd)
 	local a = agent[fd]
 	if a then 
-		skynet.kill(a)
+		mtask.kill(a)
 		agent[fd] = nil
 	end
 end
@@ -42,25 +42,25 @@ end
 
 
 function CMD.start(conf)
-	skynet.call(gate,"lua","open",conf)
+	mtask.call(gate,"lua","open",conf)
 end
 
 
 
-skynet.start(function()  
-	print("watchdog  skynet.start() called...")
-	skynet.dispatch("lua",function(session,source,cmd,subcmd,...) 
-        print("\t222=>服务地址＝=",skynet.self()," session => ",session,"source =>",source," cmd=>",cmd ,"subcmd => ",subcmd,"^^^ ...=>",...)
+mtask.start(function()  
+	print("watchdog  mtask.start() called...")
+	mtask.dispatch("lua",function(session,source,cmd,subcmd,...) 
+        print("\t222=>服务地址＝=",mtask.self()," session => ",session,"source =>",source," cmd=>",cmd ,"subcmd => ",subcmd,"^^^ ...=>",...)
 		if cmd == "socket" then
 		    local f = SOCKET[subcmd]	
 			f(...)
 			-- socket api don't need return  
 		else
 			local f  = assert(CMD[cmd])
-			skynet.ret(skynet.pack(f(subcmd,...)))
+			mtask.ret(mtask.pack(f(subcmd,...)))
 		end
 	end)
 	
-	gate = skynet.newservice("gate")
+	gate = mtask.newservice("gate")
 end)
 

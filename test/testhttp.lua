@@ -1,7 +1,7 @@
-local skynet = require "skynet"
+local mtask = require "mtask"
 local httpc = require "http.httpc"
 
-skynet.start(function()
+mtask.start(function()
 	print("GET baidu.com")
 	local header = {}
 	local status, body = httpc.get("baidu.com", "/", header)
@@ -12,5 +12,5 @@ skynet.start(function()
 	print("[body] =====>", status)
 	print(body)
 
-	skynet.exit()
+	mtask.exit()
 end)

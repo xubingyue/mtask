@@ -1,12 +1,12 @@
-local skynet = require "skynet"
-local harbor = require "skynet.harbor"
+local mtask = require "mtask"
+local harbor = require "mtask.harbor"
 
-skynet.start(function()
+mtask.start(function()
 	print("wait for harbor 2")
-	print("run skynet examples/config_log please")
+	print("run mtask examples/config_log please")
 	harbor.connect(2)
 	print("harbor 2 connected")
-	print("LOG =", skynet.address(harbor.queryname "LOG"))
+	print("LOG =", mtask.address(harbor.queryname "LOG"))
 	harbor.link(2)
 	print("disconnected")
 end)

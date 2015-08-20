@@ -1,4 +1,4 @@
-local skynet = require "skynet"
+local mtask = require "mtask"
 local mongo = require "mongo"
 local bson = require "bson"
 
@@ -69,7 +69,7 @@ function test_expire_index()
 	assert(ret and ret.test_key == 1)
 
 	for i = 1, 1000 do
-		skynet.sleep(11);
+		mtask.sleep(11);
 		
 		local ret = db[db_name].testdb:findOne({test_key = 1})
 		if ret == nil then
@@ -80,7 +80,7 @@ function test_expire_index()
 	assert(false, "test expire index failed");
 end
 
-skynet.start(function()
+mtask.start(function()
 	test_insert_without_index()
 	test_insert_with_index()
 	test_find_and_remove()

@@ -1,5 +1,5 @@
 
-local skynet = require "skynet"
+local mtask = require "mtask"
 local redis = require "redis"
 
 local conf = {
@@ -17,8 +17,8 @@ local function watching()
 	end
 end
 
-skynet.start(function()
-	skynet.fork(watching)
+mtask.start(function()
+	mtask.fork(watching)
 	local db = redis.connect(conf)
 
 	db:del "C"
@@ -63,6 +63,6 @@ skynet.start(function()
 	end
 
 	db:disconnect()
---	skynet.exit()
+--	mtask.exit()
 end)
 

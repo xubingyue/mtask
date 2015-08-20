@@ -27,7 +27,7 @@ function packdeal.send_package(client_id,ack)
 end
 
 function packdeal.unpack_package(text)
-	--skynet.error("package.unpack_package==>"..text)
+	--mtask.error("package.unpack_package==>"..text)
 	print("package.unpack_package==>",text)
 	local size = #text
 

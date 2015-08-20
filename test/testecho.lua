@@ -1,41 +1,41 @@
-local skynet = require "skynet"
+local mtask = require "mtask"
 
 local mode = ...
 
 if mode == "slave" then
 
-skynet.start(function()
-	skynet.dispatch("lua", function(_,_, ...)
-		skynet.ret(skynet.pack(...))
+mtask.start(function()
+	mtask.dispatch("lua", function(_,_, ...)
+		mtask.ret(mtask.pack(...))
 	end)
 end)
 
 else
 
-skynet.start(function()
-	local slave = skynet.newservice(SERVICE_NAME, "slave")
+mtask.start(function()
+	local slave = mtask.newservice(SERVICE_NAME, "slave")
 	local n = 100000
-	local start = skynet.now()
+	local start = mtask.now()
 	print("call salve", n, "times in queue")
 	for i=1,n do
-		skynet.call(slave, "lua")
+		mtask.call(slave, "lua")
 	end
-	print("qps = ", n/ (skynet.now() - start) * 100)
+	print("qps = ", n/ (mtask.now() - start) * 100)
 
-	start = skynet.now()
+	start = mtask.now()
 
 	local worker = 10
 	local task = n/worker
 	print("call salve", n, "times in parallel, worker = ", worker)
 
 	for i=1,worker do
-		skynet.fork(function()
+		mtask.fork(function()
 			for i=1,task do
-				skynet.call(slave, "lua")
+				mtask.call(slave, "lua")
 			end
 			worker = worker -1
 			if worker == 0 then
-				print("qps = ", n/ (skynet.now() - start) * 100)
+				print("qps = ", n/ (mtask.now() - start) * 100)
 			end
 		end)
 	end

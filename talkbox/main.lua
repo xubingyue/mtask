@@ -2,15 +2,15 @@
 --main.lua
 
 
-local skynet = require "skynet"
+local mtask = require "mtask"
 local max_client = 64
 
 
-skynet.start(function() 
+mtask.start(function() 
 	print("server  start...")
-	skynet.newservice("talkbox")
-	local watchdog = skynet.newservice("watchdog")
-	skynet.call(watchdog,"lua","start",{
+	mtask.newservice("talkbox")
+	local watchdog = mtask.newservice("watchdog")
+	mtask.call(watchdog,"lua","start",{
 				port = 10101,
 				max_client = max_client,
 		})

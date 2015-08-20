@@ -1,10 +1,10 @@
-local skynet = require "skynet"
+local mtask = require "mtask"
 local function dead_loop()
     while true do
-        skynet.sleep(0)
+        mtask.sleep(0)
     end
 end
 
-skynet.start(function()
-    skynet.fork(dead_loop)
+mtask.start(function()
+    mtask.fork(dead_loop)
 end)

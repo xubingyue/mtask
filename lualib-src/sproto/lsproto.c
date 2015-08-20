@@ -1,13 +1,6 @@
-//
-//  lsproto.c
-//  mtask
-//
-//  Created by TTc on 14/8/11.
-//  Copyright (c) 2015年 TTc. All rights reserved.
-//
+
 
 #include <string.h>
-#include <stdlib.h>
 
 #include "msvcint.h"
 #include "lua.h"

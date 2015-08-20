@@ -1,4 +1,4 @@
-local skynet = require "skynet"
+local mtask = require "mtask"
 local datacenter = require "datacenter"
 
 local function f1()
@@ -10,14 +10,14 @@ local function f1()
 end
 
 local function f2()
-	skynet.sleep(10)
+	mtask.sleep(10)
 	print("====2==== set key.foobar")
 	datacenter.set("key", "foobar", "bingo")
 end
 
-skynet.start(function()
+mtask.start(function()
 	datacenter.set("hello", "world")
 	print(datacenter.get "hello")
-	skynet.fork(f1)
-	skynet.fork(f2)
+	mtask.fork(f1)
+	mtask.fork(f2)
 end)

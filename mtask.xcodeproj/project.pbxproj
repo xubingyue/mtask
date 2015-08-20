@@ -187,6 +187,7 @@
 		798B5D921B79F0760054E773 /* mtask_lua_bson.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = mtask_lua_bson.c; sourceTree = "<group>"; };
 		798B5D941B79F0CD0054E773 /* lsha1.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = lsha1.c; sourceTree = "<group>"; };
 		798B5D961B79F1330054E773 /* mtask_lua_crypt.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = mtask_lua_crypt.c; sourceTree = "<group>"; };
+		799665621B859D5E00D3865E /* mtask_atomic.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = mtask_atomic.h; sourceTree = "<group>"; };
 		7999CFEA1B72F4EA00CF7BA0 /* mtask_snlua.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = mtask_snlua.c; sourceTree = "<group>"; };
 		79CED6A71B6B140D00378C7E /* mtask */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = mtask; sourceTree = BUILT_PRODUCTS_DIR; };
 		79CED6CB1B6B157800378C7E /* compat-5.2.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "compat-5.2.c"; sourceTree = "<group>"; };
@@ -453,6 +454,7 @@
 				79DCE8CA1B78F31D002427E5 /* socket_poll.h */,
 				79DCE8CB1B78F31D002427E5 /* socket_server.c */,
 				79DCE8CC1B78F31D002427E5 /* socket_server.h */,
+				799665621B859D5E00D3865E /* mtask_atomic.h */,
 			);
 			path = "mtask-src";
 			sourceTree = SOURCE_ROOT;

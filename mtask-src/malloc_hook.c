@@ -10,8 +10,10 @@
 #include <assert.h>
 #include <stdlib.h>
 
+
 #include "malloc_hook.h"
 #include "mtask.h"
+#include "mtask_atomic.h"
 /**
  *  内存分配池,默认使用jemalloc
  */

@@ -1,10 +1,10 @@
-local skynet = require "skynet"
+local mtask = require "mtask"
 local dc = require "datacenter"
 local mc = require "multicast"
 
-skynet.start(function()
+mtask.start(function()
 	print("remote start")
-	local console = skynet.newservice("console")
+	local console = mtask.newservice("console")
 	local channel = dc.get "MCCHANNEL"
 	if channel then
 		print("remote channel", channel)
@@ -12,8 +12,8 @@ skynet.start(function()
 		print("create local channel")
 	end
 	for i=1,10 do
-		local sub = skynet.newservice("testmulticast", "sub")
-		skynet.call(sub, "lua", "init", channel)
+		local sub = mtask.newservice("testmulticast", "sub")
+		mtask.call(sub, "lua", "init", channel)
 	end
 	local c = mc.new {
 		channel = channel ,
@@ -24,5 +24,5 @@ skynet.start(function()
 	c:unsubscribe()
 	c:publish("Remote message2")
 	c:delete()
-	skynet.exit()
+	mtask.exit()
 end)

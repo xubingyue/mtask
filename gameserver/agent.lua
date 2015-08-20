@@ -2,7 +2,7 @@
 package.path = "lualib/?.lua;gameserver/?.lua;3rd/json/?.lua"
 package.cpath = "luaclib/?.so;3rd/json/?.so"
 
-local skynet   = require "skynet"
+local mtask   = require "mtask"
 local socket   = require "socket"
 local json     = require "json"
 
@@ -15,7 +15,7 @@ function pack_json_deall(req)
 	if req then
 		print("proto: "..req["proto"])
 		if "heartbeat" == req["proto"] then
-			skynet.send("heartbeat", "lua", "heartbeat_deal", client_fd, req)
+			mtask.send("heartbeat", "lua", "heartbeat_deal", client_fd, req)
 		else
 			print("no this proto")
 		end
@@ -40,14 +40,14 @@ end
 
 
 
-skynet.register_protocol {
+mtask.register_protocol {
 	name = "client",
-	id 	 = skynet.PTYPE_CLIENT,
+	id 	 = mtask.PTYPE_CLIENT,
 	unpack = function(msg,sz)
 		print("agent   => msg",msg,sz)
-		local recPack = skynet.tostring(msg,sz)
+		local recPack = mtask.tostring(msg,sz)
 		print("recPack===>",recPack)
-			return skynet.tostring(msg,sz)
+			return mtask.tostring(msg,sz)
 		end,
 		
 	dispatch = function(session ,address,text)
@@ -62,16 +62,16 @@ skynet.register_protocol {
 
 function CMD.start(gate,fd)
 	client_fd = fd
-	skynet.call(gate,"lua","forward",fd)
+	mtask.call(gate,"lua","forward",fd)
 end
 
 
-skynet.start(function() 
-	skynet.error("agent  start....")
-	skynet.dispatch("lua",function(_,_,cmd,...)
+mtask.start(function() 
+	mtask.error("agent  start....")
+	mtask.dispatch("lua",function(_,_,cmd,...)
 		print("agent cmd===>",cmd,...)
 		
 		local f = CMD[cmd]
-		skynet.ret(skynet.pack(f(...)))
+		mtask.ret(mtask.pack(f(...)))
 	end)
 end)

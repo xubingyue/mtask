@@ -1,6 +1,6 @@
 --RPC远程调用
-local skynet = require "skynet"
-local queue = require "skynet.queue"
+local mtask = require "mtask"
+local queue = require "mtask.queue"
 local snax = require "snax"
 
 local i = 0
@@ -9,7 +9,7 @@ local hello = "hello"
 --foobar 是方法名,response 前缀表示这个方法一定有一个回应。你可以通过函数返回值来回应远程调用。
 
 function response.ping(hello)
-	skynet.sleep(100)
+	mtask.sleep(100)
 	return hello
 end
 
@@ -21,11 +21,11 @@ function accept.sleep(queue, n)
 		lock(
 		function()
 			print("accept.sleep－－－》queue=",queue, n)
-			skynet.sleep(n)
+			mtask.sleep(n)
 		end)
 	else
 		print("accept.sleep－－>queue=",queue, n)
-		skynet.sleep(n)
+		mtask.sleep(n)
 	end
 end
 

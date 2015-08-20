@@ -1,5 +1,5 @@
 --talkbox.lua
-local skynet = require "skynet"
+local mtask = require "mtask"
 local redis = require "redis"
 local netpack = require "netpack"
 local socket = require "socket"
@@ -135,11 +135,11 @@ function isUser(name)
 	return false
 end
 
-skynet.start(function()
-	skynet.dispatch("lua", function(session, address, cmd, ...)
+mtask.start(function()
+	mtask.dispatch("lua", function(session, address, cmd, ...)
 		local f = CMD[cmd]
 		
-		skynet.ret(skynet.pack(f(...)))
+		mtask.ret(mtask.pack(f(...)))
 	end)
 
 	protobuf = require "protobuf"
@@ -148,5 +148,5 @@ skynet.start(function()
 	player_data:close()
 	protobuf.register(buffer)
 	
-	skynet.register "talkbox"
+	mtask.register "talkbox"
 end)

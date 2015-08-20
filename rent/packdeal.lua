@@ -44,7 +44,7 @@ function package.unpack_package(text)
 	if not text then 
 		print("text  is  nil")
 	end
-	skynet.error("package.unpack_package==>"..text)
+	mtask.error("package.unpack_package==>"..text)
 	local size = #text
 
 	if size < 14 then   

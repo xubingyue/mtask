@@ -1,37 +1,37 @@
-local skynet = require "skynet"
+local mtask = require "mtask"
 
 local mode = ...
 
 if mode == "test" then
 
-skynet.start(function()
-	skynet.dispatch("lua", function (...)
+mtask.start(function()
+	mtask.dispatch("lua", function (...)
 		print("====>", ...)
-		skynet.exit()
+		mtask.exit()
 	end)
 end)
 
 elseif mode == "dead" then
 
-skynet.start(function()
-	skynet.dispatch("lua", function (...)
-		skynet.sleep(100)
-		print("return", skynet.ret "")
+mtask.start(function()
+	mtask.dispatch("lua", function (...)
+		mtask.sleep(100)
+		print("return", mtask.ret "")
 	end)
 end)
 
 else
 
-	skynet.start(function()
-		local test = skynet.newservice(SERVICE_NAME, "test")	-- launch self in test mode
+	mtask.start(function()
+		local test = mtask.newservice(SERVICE_NAME, "test")	-- launch self in test mode
 
 		print(pcall(function()
-			skynet.call(test,"lua", "dead call")
+			mtask.call(test,"lua", "dead call")
 		end))
 
-		local dead = skynet.newservice(SERVICE_NAME, "dead")	-- launch self in dead mode
+		local dead = mtask.newservice(SERVICE_NAME, "dead")	-- launch self in dead mode
 
-		skynet.timeout(0, skynet.exit)	-- exit after a while, so the call never return
-		skynet.call(dead, "lua", "whould not return")
+		mtask.timeout(0, mtask.exit)	-- exit after a while, so the call never return
+		mtask.call(dead, "lua", "whould not return")
 	end)
 end
