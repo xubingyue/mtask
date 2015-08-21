@@ -104,13 +104,13 @@ timer_add(struct timer *T,void *arg,size_t sz,int time) {
     /*copy arg*/
     memcpy(node+1,arg,sz);
     
-   	SPIN_LOCK(T)
+   	SPIN_LOCK(T);
     /*update the expire time*/
     node->expire=time+T->time;
     /*add the node into timer handle*/
     add_node(T,node);
     
-    SPIN_UNLOCK(T)
+    SPIN_UNLOCK(T);
 
 }
 
@@ -235,7 +235,7 @@ mtask_timeout(uint32_t handle, int time, int session) {
         message.session = session;
         message.data = NULL;
         /*makr this msg as response*/
-        message.sz = PTYPE_RESPONSE << MESSAGE_TYPE_SHIFT;
+        message.sz = (size_t)PTYPE_RESPONSE << MESSAGE_TYPE_SHIFT;
         /*send this msg to the module,trigger directly*/
         if (mtask_context_push(handle, &message)) {
             return -1;

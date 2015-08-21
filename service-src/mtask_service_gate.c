@@ -89,7 +89,7 @@ _parm(char *msg,int sz,int command_sz) {
 }
 
 static void
-_forward_agent(struct gate *g,int fd,int32_t agentaddr,uint32_t clientaddr) {
+_forward_agent(struct gate *g,int fd,uint32_t agentaddr,uint32_t clientaddr) {
     int id = hashid_lookup(&g->hash, fd);
     if (id>=0) {
         struct connection *agent = &g->conn[id];
@@ -283,7 +283,7 @@ dispatch_socket_message(struct gate *g,const struct mtask_socket_message *messag
             if (hashid_full(&g->hash)) {
                 mtask_socket_close(ctx, message->ud);
             } else {
-                struct connection *c = &g->conn[hashid_insert(&g->hash, message->id)];
+                struct connection *c = &g->conn[hashid_insert(&g->hash, message->ud)];
                 if (sz>= sizeof(c->remote_name)) {
                     sz=sizeof(c->remote_name) -1;
                 }
@@ -293,6 +293,9 @@ dispatch_socket_message(struct gate *g,const struct mtask_socket_message *messag
                 mtask_socket_start(ctx, message->ud);
             }
             break;
+		case MTASK_SOCKET_TYPE_WARNING:
+			mtask_error(ctx, "fd (%d) send buffer (%d)K", message->id, message->ud);
+		break;
     }
 }
 
@@ -310,7 +313,7 @@ _gate(struct mtask_context * ctx, void * ud, int type, int session, uint32_t sou
             }
            /*the last 4bytes in msg are the id of socket ,write following bytes to it*/
             const uint8_t *idbuf =msg +sz-4;
-            uint32_t uid = idbuf[0] | idbuf[1]<< 8 | idbuf[2] << 16 | idbuf[3]<< 32;
+            uint32_t uid = idbuf[0] | idbuf[1]<< 8 | idbuf[2] << 16 | idbuf[3]<< 24;
             
             int id = hashid_lookup(&g->hash, uid);
             if (id>=0) {
@@ -322,12 +325,13 @@ _gate(struct mtask_context * ctx, void * ud, int type, int session, uint32_t sou
                 mtask_error(ctx, "Invalid client id %d from %x",(int)uid,source);
                 break;
             }
-            break;
+           
         }
         case PTYPE_SOCKET:
             assert(source==0);
             /*recv  socket message from mtast_socket*/
             dispatch_socket_message(g, msg, (int)(sz-sizeof(struct mtask_socket_message)));
+		 break;
     }
     return 0;
 }

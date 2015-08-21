@@ -22,6 +22,7 @@ struct snlua {
     struct mtask_context *ctx;
 };
 
+// LUA_CACHELIB may defined in patched lua for shared proto
 #ifdef LUA_CACHELIB
 
 #define  codecache luaopen_cache
@@ -64,6 +65,7 @@ traceback(lua_State *L) {
 
 static void
 _report_launcher_error(struct mtask_context *ctx) {
+	// sizeof "ERROR" == 5
     mtask_send_name(ctx, 0, ".launcher", PTYPE_TEXT, 0, "ERROR", 5);
 }
 
@@ -167,7 +169,8 @@ snlua_init(struct snlua *l,struct mtask_context *ctx,const char *args) {
     const char *self = mtask_command(ctx, "REG", NULL);
     
     uint32_t handle_id = strtoul(self+1, NULL, 16);
-    
+    printf("handle_id==%d",handle_id);
+    // it must be first message
     mtask_send(ctx, 0, handle_id, PTYPE_TAG_DONT_COPY,0, tmp, sz);
     
     return 0;
@@ -187,7 +190,14 @@ snlua_release(struct snlua *l) {
     mtask_free(l);
 }
 
-
+void
+snlua_signal(struct snlua *l, int signal) {
+	mtask_error(l->ctx, "recv a signal %d", signal);
+#ifdef lua_checksig
+	// If our lua support signal (modified lua version by mtask), trigger it.
+	mtask_sig_L = l->L;
+#endif
+}
 
 
 

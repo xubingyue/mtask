@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <assert.h>
+#include <string.h>
 
 #include "rwlock.h"
 #include "mtask_malloc.h"

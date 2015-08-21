@@ -272,12 +272,12 @@ _redirect(lua_State *L) {
             } else {
                 session = mtask_send(ctx, source, dst, type | PTYPE_TAG_DONT_COPY, session, msg, size);
             }
+	      }
             break;
         default:
             luaL_error(L, "mtask.redirect invalid param %s", lua_typename(L,mtype));
         }
-            
-    }
+
     return 0;
 }
 

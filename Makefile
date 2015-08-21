@@ -6,6 +6,7 @@ CSERVICE_PATH ?= cservice
 MTASK_BUILD_PATH ?= .
 
 CFLAGS = -g -O2 -Wall -I$(LUA_INC) $(MYCFLAGS) 
+# CFLAGS += -DUSE_PTHREAD_LOCK
 
 # lua
 
@@ -66,7 +67,7 @@ $(CSERVICE_PATH) :
 	mkdir $(CSERVICE_PATH)
 
 define CSERVICE_TEMP
-  $$(CSERVICE_PATH)/$(1).so : service-src/mtask_$(1).c | $$(CSERVICE_PATH)
+  $$(CSERVICE_PATH)/$(1).so : service-src/mtask_service_$(1).c | $$(CSERVICE_PATH)
 		$$(CC) $$(CFLAGS) $$(SHARED) $$< -o $$@ -Imtask-src
 endef
 
@@ -97,7 +98,7 @@ $(LUA_CLIB_PATH)/memory.so : lualib-src/mtask_lua_memory.c | $(LUA_CLIB_PATH)
 		$(CC) $(CFLAGS) $(SHARED) -Imtask-src $^ -o $@ 
 
 $(LUA_CLIB_PATH)/profile.so : lualib-src/mtask_lua_profile.c | $(LUA_CLIB_PATH)
-		$(CC) $(CFLAGS) $(SHARED) $^ -o $@ 
+		$(CC) $(CFLAGS) $(SHARED)  $^ -o $@ 
 
 $(LUA_CLIB_PATH)/multicast.so : lualib-src/mtask_lua_multicast.c | $(LUA_CLIB_PATH)
 		$(CC) $(CFLAGS) $(SHARED) -Imtask-src $^ -o $@ 
@@ -106,10 +107,10 @@ $(LUA_CLIB_PATH)/cluster.so : lualib-src/mtask_lua_cluster.c | $(LUA_CLIB_PATH)
 		$(CC) $(CFLAGS) $(SHARED) -Imtask-src $^ -o $@ 
 
 $(LUA_CLIB_PATH)/crypt.so : lualib-src/mtask_lua_crypt.c lualib-src/lsha1.c | $(LUA_CLIB_PATH)
-		$(CC) $(CFLAGS) $(SHARED) $^ -o $@ 
+		$(CC) $(CFLAGS) $(SHARED)  $^ -o $@ 
 
 $(LUA_CLIB_PATH)/sharedata.so : lualib-src/mtask_lua_sharedata.c | $(LUA_CLIB_PATH)
-		$(CC) $(CFLAGS) $(SHARED) $^ -o $@ 
+		$(CC) $(CFLAGS) $(SHARED) -Imtask-src $^ -o $@ 
 
 $(LUA_CLIB_PATH)/stm.so : lualib-src/mtask_lua_stm.c | $(LUA_CLIB_PATH)
 		$(CC) $(CFLAGS) $(SHARED) -Imtask-src $^ -o $@ 
@@ -124,7 +125,7 @@ $(LUA_CLIB_PATH)/mysqlaux.so : lualib-src/mtask_lua_mysqlaux.c | $(LUA_CLIB_PATH
 		$(CC) $(CFLAGS) $(SHARED) $^ -o $@
 
 $(LUA_CLIB_PATH)/debugchannel.so : lualib-src/mtask_lua_debugchannel.c | $(LUA_CLIB_PATH)
-		$(CC) $(CFLAGS) $(SHARED) $^ -o $@
+		$(CC) $(CFLAGS) $(SHARED) -Imtask-src  $^ -o $@
 
 clean :
 		rm -f $(MTASK__BUILD_PATH)/mtask $(CSERVICE_PATH)/*.so $(LUA_CLIB_PATH)/*.so
