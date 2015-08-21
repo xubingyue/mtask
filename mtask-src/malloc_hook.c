@@ -1,10 +1,3 @@
-//
-//  malloc_hook.c
-//  mtask
-//
-//  Created by TTc on 14/9/31.
-//  Copyright (c) 2015年 TTc. All rights reserved.
-//
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -14,15 +7,12 @@
 #include "malloc_hook.h"
 #include "mtask.h"
 #include "mtask_atomic.h"
-/**
- *  内存分配池,默认使用jemalloc
- */
+
 static size_t _used_memory = 0;
 static size_t _memory_block = 0;
-
 typedef struct _mem_data {
-    uint32_t handle;
-    ssize_t allocated;
+	uint32_t handle;
+	ssize_t allocated;
 } mem_data;
 
 #define SLOT_SIZE 0x10000
@@ -37,210 +27,204 @@ static mem_data mem_stats[SLOT_SIZE];
 
 static ssize_t*
 get_allocated_field(uint32_t handle) {
-    int h = (int)(handle & (SLOT_SIZE - 1));
-    mem_data *data = &mem_stats[h];
-    uint32_t old_handle = data->handle;
-    ssize_t old_alloc = data->allocated;
-    if(old_handle == 0 || old_alloc <= 0) {
-        // data->allocated 可能小于零,因为它可能不会在开始计数。
-        if(!ATOM_CAS(&data->handle, old_handle, handle)) {
-            return 0;
-        }
-        if (old_alloc < 0) {
-            ATOM_CAS(&data->allocated, old_alloc, 0);
-        }
-    }
-    if(data->handle != handle) {
-        return 0;
-    }
-    return &data->allocated;
+	int h = (int)(handle & (SLOT_SIZE - 1));
+	mem_data *data = &mem_stats[h];
+	uint32_t old_handle = data->handle;
+	ssize_t old_alloc = data->allocated;
+	if(old_handle == 0 || old_alloc <= 0) {
+		// data->allocated may less than zero, because it may not count at start.
+		if(!ATOM_CAS(&data->handle, old_handle, handle)) {
+			return 0;
+		}
+		if (old_alloc < 0) {
+			ATOM_CAS(&data->allocated, old_alloc, 0);
+		}
+	}
+	if(data->handle != handle) {
+		return 0;
+	}
+	return &data->allocated;
 }
 
-inline static void
+inline static void 
 update_xmalloc_stat_alloc(uint32_t handle, size_t __n) {
-    ATOM_ADD(&_used_memory, __n);
-    ATOM_INC(&_memory_block);
-    ssize_t* allocated = get_allocated_field(handle);
-    if(allocated) {
-        ATOM_ADD(allocated, __n);
-    }
+	ATOM_ADD(&_used_memory, __n);
+	ATOM_INC(&_memory_block); 
+	ssize_t* allocated = get_allocated_field(handle);
+	if(allocated) {
+		ATOM_ADD(allocated, __n);
+	}
 }
 
 inline static void
 update_xmalloc_stat_free(uint32_t handle, size_t __n) {
-   	ATOM_SUB(&_used_memory, __n);
+	ATOM_SUB(&_used_memory, __n);
 	ATOM_DEC(&_memory_block);
-    ssize_t* allocated = get_allocated_field(handle);
-    if(allocated) {
-        ATOM_SUB(allocated, __n);
-    }
+	ssize_t* allocated = get_allocated_field(handle);
+	if(allocated) {
+		ATOM_SUB(allocated, __n);
+	}
 }
 
 inline static void*
 fill_prefix(char* ptr) {
-    uint32_t handle = mtask_current_handle();
-    size_t size = je_malloc_usable_size(ptr);
-    uint32_t *p = (uint32_t *)(ptr + size - sizeof(uint32_t));
-    memcpy(p, &handle, sizeof(handle));
-    
-    update_xmalloc_stat_alloc(handle, size);
-    return ptr;
+	uint32_t handle = mtask_current_handle();
+	size_t size = je_malloc_usable_size(ptr);
+	uint32_t *p = (uint32_t *)(ptr + size - sizeof(uint32_t));
+	memcpy(p, &handle, sizeof(handle));
+
+	update_xmalloc_stat_alloc(handle, size);
+	return ptr;
 }
 
 inline static void*
 clean_prefix(char* ptr) {
-    size_t size = je_malloc_usable_size(ptr);
-    uint32_t *p = (uint32_t *)(ptr + size - sizeof(uint32_t));
-    uint32_t handle;
-    memcpy(&handle, p, sizeof(handle));
-    update_xmalloc_stat_free(handle, size);
-    return ptr;
+	size_t size = je_malloc_usable_size(ptr);
+	uint32_t *p = (uint32_t *)(ptr + size - sizeof(uint32_t));
+	uint32_t handle;
+	memcpy(&handle, p, sizeof(handle));
+	update_xmalloc_stat_free(handle, size);
+	return ptr;
 }
 
 static void malloc_oom(size_t size) {
-    fprintf(stderr, "xmalloc: Out of memory trying to allocate %zu bytes\n",
-            size);
-    fflush(stderr);
-    abort();
+	fprintf(stderr, "xmalloc: Out of memory trying to allocate %zu bytes\n",
+		size);
+	fflush(stderr);
+	abort();
 }
 
-void
+void 
 memory_info_dump(void) {
-    je_malloc_stats_print(0,0,0);
+	je_malloc_stats_print(0,0,0);
 }
 
-size_t
+size_t 
 mallctl_int64(const char* name, size_t* newval) {
-    size_t v = 0;
-    size_t len = sizeof(v);
-    if(newval) {
-        je_mallctl(name, &v, &len, newval, sizeof(size_t));
-    } else {
-        je_mallctl(name, &v, &len, NULL, 0);
-    }
-    // mtask_error(NULL, "name: %s, value: %zd\n", name, v);
-    return v;
+	size_t v = 0;
+	size_t len = sizeof(v);
+	if(newval) {
+		je_mallctl(name, &v, &len, newval, sizeof(size_t));
+	} else {
+		je_mallctl(name, &v, &len, NULL, 0);
+	}
+	// mtask_error(NULL, "name: %s, value: %zd\n", name, v);
+	return v;
 }
 
-int
+int 
 mallctl_opt(const char* name, int* newval) {
-    int v = 0;
-    size_t len = sizeof(v);
-    if(newval) {
-        int ret = je_mallctl(name, &v, &len, newval, sizeof(int));
-        if(ret == 0) {
-            mtask_error(NULL, "set new value(%d) for (%s) succeed\n", *newval, name);
-        } else {
-            mtask_error(NULL, "set new value(%d) for (%s) failed: error -> %d\n", *newval, name, ret);
-        }
-    } else {
-        je_mallctl(name, &v, &len, NULL, 0);
-    }
-    
-    return v;
+	int v = 0;
+	size_t len = sizeof(v);
+	if(newval) {
+		int ret = je_mallctl(name, &v, &len, newval, sizeof(int));
+		if(ret == 0) {
+			mtask_error(NULL, "set new value(%d) for (%s) succeed\n", *newval, name);
+		} else {
+			mtask_error(NULL, "set new value(%d) for (%s) failed: error -> %d\n", *newval, name, ret);
+		}
+	} else {
+		je_mallctl(name, &v, &len, NULL, 0);
+	}
+
+	return v;
 }
 
 // hook : malloc, realloc, free, calloc
 
 void *
 mtask_malloc(size_t size) {
-    void* ptr = je_malloc(size + PREFIX_SIZE);
-    if(!ptr) malloc_oom(size);
-    return fill_prefix(ptr);
+	void* ptr = je_malloc(size + PREFIX_SIZE);
+	if(!ptr) malloc_oom(size);
+	return fill_prefix(ptr);
 }
 
 void *
 mtask_realloc(void *ptr, size_t size) {
-    if (ptr == NULL) return mtask_malloc(size);
-    
-    void* rawptr = clean_prefix(ptr);
-    void *newptr = je_realloc(rawptr, size+PREFIX_SIZE);
-    if(!newptr) malloc_oom(size);
-    return fill_prefix(newptr);
+	if (ptr == NULL) return mtask_malloc(size);
+
+	void* rawptr = clean_prefix(ptr);
+	void *newptr = je_realloc(rawptr, size+PREFIX_SIZE);
+	if(!newptr) malloc_oom(size);
+	return fill_prefix(newptr);
 }
 
 void
 mtask_free(void *ptr) {
-    if (ptr == NULL) return;
-    void* rawptr = clean_prefix(ptr);
-    je_free(rawptr);
+	if (ptr == NULL) return;
+	void* rawptr = clean_prefix(ptr);
+	je_free(rawptr);
 }
 
 void *
 mtask_calloc(size_t nmemb,size_t size) {
-    void* ptr = je_calloc(nmemb + ((PREFIX_SIZE+size-1)/size), size );
-    if(!ptr) malloc_oom(size);
-    return fill_prefix(ptr);
+	void* ptr = je_calloc(nmemb + ((PREFIX_SIZE+size-1)/size), size );
+	if(!ptr) malloc_oom(size);
+	return fill_prefix(ptr);
 }
 
 #else
 
-void
+void 
 memory_info_dump(void) {
-    mtask_error(NULL, "No jemalloc");
+	mtask_error(NULL, "No jemalloc");
 }
 
-size_t
+size_t 
 mallctl_int64(const char* name, size_t* newval) {
-    mtask_error(NULL, "No jemalloc : mallctl_int64 %s.", name);
-    return 0;
+	mtask_error(NULL, "No jemalloc : mallctl_int64 %s.", name);
+	return 0;
 }
 
-int
+int 
 mallctl_opt(const char* name, int* newval) {
-    mtask_error(NULL, "No jemalloc : mallctl_opt %s.", name);
-    return 0;
+	mtask_error(NULL, "No jemalloc : mallctl_opt %s.", name);
+	return 0;
 }
 
 #endif
 
 size_t
 malloc_used_memory(void) {
-    return _used_memory;
+	return _used_memory;
 }
 
 size_t
 malloc_memory_block(void) {
-    return _memory_block;
+	return _memory_block;
 }
 
 void
 dump_c_mem() {
-    int i;
-    size_t total = 0;
-    mtask_error(NULL, "dump all service mem:");
-    for(i=0; i<SLOT_SIZE; i++) {
-        mem_data* data = &mem_stats[i];
-        if(data->handle != 0 && data->allocated != 0) {
-            total += data->allocated;
-            mtask_error(NULL, "0x%x -> %zdkb", data->handle, data->allocated >> 10);
-        }
-    }
-    mtask_error(NULL, "+total: %zdkb",total >> 10);
+	int i;
+	size_t total = 0;
+	mtask_error(NULL, "dump all service mem:");
+	for(i=0; i<SLOT_SIZE; i++) {
+		mem_data* data = &mem_stats[i];
+		if(data->handle != 0 && data->allocated != 0) {
+			total += data->allocated;
+			mtask_error(NULL, "0x%x -> %zdkb", data->handle, data->allocated >> 10);
+		}
+	}
+	mtask_error(NULL, "+total: %zdkb",total >> 10);
 }
-/**
- *  字符串复制(辅助函数)
- *
- *  @param str 待操作的字符串
- *
- *  @return //返回新串的地址
- */
+
 char *
-mtask_strdup(const char *str) {                                 //将串拷贝到新建的位置处
-    size_t sz = strlen(str);                                     //字符串大小
-    char * ret = mtask_malloc(sz+1);
-    memcpy(ret, str, sz+1);                                      //拷贝数据
-    return ret;                                                  //返回新串的地址
+mtask_strdup(const char *str) {
+	size_t sz = strlen(str);
+	char * ret = mtask_malloc(sz+1);
+	memcpy(ret, str, sz+1);
+	return ret;
 }
 
 void * 
 mtask_lalloc(void *ud, void *ptr, size_t osize, size_t nsize) {
-    if (nsize == 0) {
-        mtask_free(ptr);
-        return NULL;
-    } else {
-        return mtask_realloc(ptr, nsize);
-    }
+	if (nsize == 0) {
+		mtask_free(ptr);
+		return NULL;
+	} else {
+		return mtask_realloc(ptr, nsize);
+	}
 }
 
 int

@@ -43,7 +43,7 @@ static unsigned char*
 escape_sql_str(unsigned char *dst, unsigned char *src, size_t size)
 {
     
-    while (size) {
+      while (size) {
         if ((*src & 0x80) == 0) {
             switch (*src) {
                 case '\0':

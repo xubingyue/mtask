@@ -1,75 +1,47 @@
-//
-//  mtask_monitor.c
-//  mtask
-//
-//  Created by TTc on 14/9/31.
-//  Copyright (c) 2015年 TTc. All rights reserved.
-//
+#include "mtask.h"
+
+#include "mtask_monitor.h"
+#include "mtask_server.h"
+#include "mtask.h"
+#include "mtask_atomic.h"
 
 #include <stdlib.h>
 #include <string.h>
 
-
-#include "mtask.h"
-#include "mtask_monitor.h"
-#include "mtask_server.h"
-
-#include "mtask_atomic.h"
 struct mtask_monitor {
-    int version;        /*curr ver*/
-    int check_version;  /*old ver*/
-    uint32_t source;    /*source for module*/
-    uint32_t destination;/*dst for module,used to check if the module in work*/
+	int version;
+	int check_version;
+	uint32_t source;
+	uint32_t destination;
 };
 
-
-
-struct mtask_monitor *
-mtask_monitor_new(){
-    struct mtask_monitor *ret = mtask_malloc(sizeof(*ret));
-    memset(ret, 0, sizeof(*ret));
-    return ret;
-}
-/**  触发监视器
- *  在派发消息之前触发监视器(设置tm->source tm->destination)
- *
- *  在派发消息之后重置监视器(同样是调用mtask_monitor_trigger),为什么调用同一个函数,效果不同？因为在tm->destination为0的时候,检查监视器是毫无效果的
- *  而在派发消息之前触发了监视器,但是派发消息时陷入死循环,那么就没有重置监视器,在检查监视器的时候,就会出现
- *
- *  tm->version == tm->check_version并且tm->destination不为0了,就要报告错误了(mtask_error)
- *
- *  @param tm          监视器      handle of the monitor
- *  @param source      来源服务地址 source of the module
- *  @param destination 目的服务地址 dstination dst for the module
- */
-void
-mtask_monitor_delete(struct mtask_monitor *tm) {
-    mtask_free(tm);
+struct mtask_monitor * 
+mtask_monitor_new() {
+	struct mtask_monitor * ret = mtask_malloc(sizeof(*ret));
+	memset(ret, 0, sizeof(*ret));
+	return ret;
 }
 
-
-/*trigger the monitor*/
-void
-mtask_monitor_trigger(struct mtask_monitor *tm,uint32_t source,uint32_t dst) {
-    tm->source = source;
-    tm->destination = dst;
-    ATOM_INC(&tm->version);
+void 
+mtask_monitor_delete(struct mtask_monitor *sm) {
+	mtask_free(sm);
 }
 
-/* watchdog for check if the module unregister*/
-void
-mtask_monitor_check(struct mtask_monitor *tm) {
-    /*module in work, so we can check if the module uninstalled when we try to use it*/
-    if(tm->version == tm->check_version) {
-        if(tm->destination) {
-            /*check if the module exit, and try to mark as exit*/
-            mtask_context_endless(tm->destination);
-            mtask_error(NULL, "a message from [ :%08x ] to [ :%08x ] maybe in an endless loop (version = %d)",tm->source , tm->destination, tm->version);
-        }
-    } else {  /*module maybe not in work, just update version*/
-        tm->check_version = tm->version;
-    }
+void 
+mtask_monitor_trigger(struct mtask_monitor *sm, uint32_t source, uint32_t destination) {
+	sm->source = source;
+	sm->destination = destination;
+	ATOM_INC(&sm->version);
 }
 
-
-
+void 
+mtask_monitor_check(struct mtask_monitor *sm) {
+	if (sm->version == sm->check_version) {
+		if (sm->destination) {
+			mtask_context_endless(sm->destination);
+			mtask_error(NULL, "A message from [ :%08x ] to [ :%08x ] maybe in an endless loop (version = %d)", sm->source , sm->destination, sm->version);
+		}
+	} else {
+		sm->check_version = sm->version;
+	}
+}

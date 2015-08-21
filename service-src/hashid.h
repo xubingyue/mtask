@@ -1,11 +1,3 @@
-//
-//  hashid.h
-//  mtask
-//
-//  Created by TTc on 14/8/7.
-//  Copyright (c) 2015年 TTc. All rights reserved.
-//
-
 #ifndef mtask_hashid_h
 #define mtask_hashid_h
 
@@ -13,121 +5,116 @@
 #include <stdlib.h>
 #include <string.h>
 
-
 struct hashid_node {
-    int id;
-    struct hashid_node *next;
+	int id;
+	struct hashid_node *next;
 };
 
 struct hashid {
-    int hashmod;
-    int cap;
-    int count;
-    struct hashid_node *id;
-    struct hashid_node **hash;
+	int hashmod;
+	int cap;
+	int count;
+	struct hashid_node *id;
+	struct hashid_node **hash;
 };
 
 static void
-hashid_init(struct hashid *hi,int max) {
-    int i;
-    int hashcap = 16;
-    /*如果 hash 表的池不够用了,则成倍扩大池,并将内部的数据重新 hash 一次*/
-    /*这样虽然会浪费一些 id,但是可以保证 hash 表类的 key 永远不发生碰撞,这样可以让查询速度最快。*/
-    /*hash 表的实现也相对简单一些*/
-    while (hashcap < max) {
-        hashcap *= 2;
-    }
-    hi->hashmod = hashcap -1;
-    hi->cap = max;
-    hi->count = 0;
-    hi->id = mtask_malloc(max * sizeof(struct hashid_node));
-    for (i=0; i<max; i++) {
-        hi->id[i].id = -1;
-        hi->id[i].next = NULL;
-    }
-    hi->hash = mtask_malloc(hashcap *sizeof(struct hashid_node *));
-    memset(hi->hash,0,hashcap *sizeof(struct hashid_node));
+hashid_init(struct hashid *hi, int max) {
+	int i;
+	int hashcap;
+	hashcap = 16;
+	while (hashcap < max) {
+		hashcap *= 2;
+	}
+	hi->hashmod = hashcap - 1;
+	hi->cap = max;
+	hi->count = 0;
+	hi->id = mtask_malloc(max * sizeof(struct hashid_node));
+	for (i=0;i<max;i++) {
+		hi->id[i].id = -1;
+		hi->id[i].next = NULL;
+	}
+	hi->hash = mtask_malloc(hashcap * sizeof(struct hashid_node *));
+	memset(hi->hash, 0, hashcap * sizeof(struct hashid_node *));
 }
+
 static void
 hashid_clear(struct hashid *hi) {
-    mtask_free(hi->id);
-    mtask_free(hi->hash);
-    hi->id = NULL;
-    hi->hash = NULL;
-    hi->hashmod = 1;
-    hi->cap = 0;
-    hi->count = 0;
+	mtask_free(hi->id);
+	mtask_free(hi->hash);
+	hi->id = NULL;
+	hi->hash = NULL;
+	hi->hashmod = 1;
+	hi->cap = 0;
+	hi->count = 0;
 }
 
 static int
 hashid_lookup(struct hashid *hi, int id) {
-    int h = id & hi->hashmod;
-    struct hashid_node * c = hi->hash[h];
-    while(c) {
-        if (c->id == id)
-            return c - hi->id;
-        c = c->next;
-    }
-    return -1;
+	int h = id & hi->hashmod;
+	struct hashid_node * c = hi->hash[h];
+	while(c) {
+		if (c->id == id)
+			return c - hi->id;
+		c = c->next;
+	}
+	return -1;
 }
 
 static int
 hashid_remove(struct hashid *hi, int id) {
-    int h = id & hi->hashmod;
-    struct hashid_node * c = hi->hash[h];
-    if (c == NULL)
-        return -1;
-    if (c->id == id) {
-        hi->hash[h] = c->next;
-        goto _clear;
-    }
-    while(c->next) {
-        if (c->next->id == id) {
-            struct hashid_node * temp = c->next;
-            c->next = temp->next;
-            c = temp;
-            goto _clear;
-        }
-        c = c->next;
-    }
-    return -1;
+	int h = id & hi->hashmod;
+	struct hashid_node * c = hi->hash[h];
+	if (c == NULL)
+		return -1;
+	if (c->id == id) {
+		hi->hash[h] = c->next;
+		goto _clear;
+	}
+	while(c->next) {
+		if (c->next->id == id) {
+			struct hashid_node * temp = c->next;
+			c->next = temp->next;
+			c = temp;
+			goto _clear;
+		}
+		c = c->next;
+	}
+	return -1;
 _clear:
-    c->id = -1;
-    c->next = NULL;
-    --hi->count;
-    return c - hi->id;
+	c->id = -1;
+	c->next = NULL;
+	--hi->count;
+	return c - hi->id;
 }
 
 static int
 hashid_insert(struct hashid * hi, int id) {
-    struct hashid_node *c = NULL;
-    int i;
-    for (i=0;i<hi->cap;i++) {
-        int index = (i+id) % hi->cap;
-        if (hi->id[index].id == -1) {
-            c = &hi->id[index];
-            break;
-        }
-    }
-    assert(c);
-    ++hi->count;
-    c->id = id;
-    assert(c->next == NULL);
-    int h = id & hi->hashmod;
-    if (hi->hash[h]) {
-        c->next = hi->hash[h];
-    }
-    hi->hash[h] = c;
-    
-    return c - hi->id;
+	struct hashid_node *c = NULL;
+	int i;
+	for (i=0;i<hi->cap;i++) {
+		int index = (i+id) % hi->cap;
+		if (hi->id[index].id == -1) {
+			c = &hi->id[index];
+			break;
+		}
+	}
+	assert(c);
+	++hi->count;
+	c->id = id;
+	assert(c->next == NULL);
+	int h = id & hi->hashmod;
+	if (hi->hash[h]) {
+		c->next = hi->hash[h];
+	}
+	hi->hash[h] = c;
+	
+	return c - hi->id;
 }
 
 static inline int
 hashid_full(struct hashid *hi) {
-    return hi->count == hi->cap;
+	return hi->count == hi->cap;
 }
-
-
-
 
 #endif

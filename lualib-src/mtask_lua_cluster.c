@@ -1,18 +1,9 @@
-//
-//  mtask_lua_cluster.c
-//  mtask
-//
-//  Created by TTc on 14/8/11.
-//  Copyright (c) 2015年 TTc. All rights reserved.
-//
-
 #include <lua.h>
 #include <lauxlib.h>
 #include <string.h>
 #include <assert.h>
 
 #include "mtask.h"
-
 
 /*
 	uint32_t/string addr 
@@ -24,23 +15,23 @@
 		string request
 		uint32_t next_session
  */
-//#define TEMP_LENGTH 0x10007 /*65543 0x10000 = 2 ^ 16  = 2 ^ 6 * 2 ^10 = 64 X 1024 = 65536*/
 
 #define TEMP_LENGTH 0x8200
 #define MULTI_PART 0x8000
+
 static void
 fill_uint32(uint8_t * buf, uint32_t n) {
-    buf[0] = n & 0xff;
-    buf[1] = (n >> 8) & 0xff;
-    buf[2] = (n >> 16) & 0xff;
-    buf[3] = (n >> 24) & 0xff;
+	buf[0] = n & 0xff;
+	buf[1] = (n >> 8) & 0xff;
+	buf[2] = (n >> 16) & 0xff;
+	buf[3] = (n >> 24) & 0xff;
 }
 
 static void
 fill_header(lua_State *L, uint8_t *buf, int sz) {
-    assert(sz< 0x10000);
-    buf[0] = (sz >> 8) & 0xff;
-    buf[1] = sz & 0xff;
+	assert(sz < 0x10000);
+	buf[0] = (sz >> 8) & 0xff;
+	buf[1] = sz & 0xff;
 }
 
 /*
@@ -81,8 +72,8 @@ fill_header(lua_State *L, uint8_t *buf, int sz) {
  */
 static int
 packreq_number(lua_State *L, int session, void * msg, uint32_t sz) {
-    uint32_t addr = (uint32_t)lua_tointeger(L,1);
-    uint8_t buf[TEMP_LENGTH];
+	uint32_t addr = (uint32_t)lua_tointeger(L,1);
+	uint8_t buf[TEMP_LENGTH];
 	if (sz < MULTI_PART) {
 		fill_header(L, buf, sz+9);
 		buf[2] = 0;
@@ -106,14 +97,14 @@ packreq_number(lua_State *L, int session, void * msg, uint32_t sz) {
 
 static int
 packreq_string(lua_State *L, int session, void * msg, uint32_t sz) {
-    size_t namelen = 0;
-    const char *name = lua_tolstring(L, 1, &namelen);
-    if (name == NULL || namelen < 1 || namelen > 255) {
-        mtask_free(msg);
-        luaL_error(L, "name is too long %s", name);
-    }
-    
-    uint8_t buf[TEMP_LENGTH];
+	size_t namelen = 0;
+	const char *name = lua_tolstring(L, 1, &namelen);
+	if (name == NULL || namelen < 1 || namelen > 255) {
+		mtask_free(msg);
+		luaL_error(L, "name is too long %s", name);
+	}
+
+	uint8_t buf[TEMP_LENGTH];
 	if (sz < MULTI_PART) {
 		fill_header(L, buf, sz+6+namelen);
 		buf[2] = 0x80;
@@ -162,32 +153,32 @@ packreq_multi(lua_State *L, int session, void * msg, uint32_t sz) {
 		ptr += s;
 	}
 }
+
 static int
 lpackrequest(lua_State *L) {
-    void *msg = lua_touserdata(L, 3);
-    if (msg == NULL) {
-        return luaL_error(L, "Invalid request message");
-    }
-    uint32_t sz = (uint32_t)luaL_checkinteger(L, 4);
-    int session = luaL_checkinteger(L, 2);
-    if (session <= 0) {
+	void *msg = lua_touserdata(L,3);
+	if (msg == NULL) {
+		return luaL_error(L, "Invalid request message");
+	}
+	uint32_t sz = (uint32_t)luaL_checkinteger(L,4);
+	int session = luaL_checkinteger(L,2);
+	if (session <= 0) {
 		mtask_free(msg);
-        return luaL_error(L, "Invalid request session %d", session);
-    }
-    int addr_type = lua_type(L,1);
+		return luaL_error(L, "Invalid request session %d", session);
+	}
+	int addr_type = lua_type(L,1);
 	int multipak;
-    if (addr_type == LUA_TNUMBER) {
-        multipak=packreq_number(L, session, msg, sz);
-    } else {
-        multipak=packreq_string(L, session, msg, sz);
-    }
-	int current_session=session;
-    if (++session < 0) {
-        session = 1;
-    }
-    
-    lua_pushinteger(L, session);
-	if(multipak) {
+	if (addr_type == LUA_TNUMBER) {
+		multipak = packreq_number(L, session, msg, sz);
+	} else {
+		multipak = packreq_string(L, session, msg, sz);
+	}
+	int current_session = session;
+	if (++session < 0) {
+		session = 1;
+	}
+	lua_pushinteger(L, session);
+	if (multipak) {
 		lua_createtable(L, multipak, 0);
 		packreq_multi(L, current_session, msg, sz);
 		mtask_free(msg);
@@ -196,8 +187,6 @@ lpackrequest(lua_State *L) {
 		mtask_free(msg);
 		return 2;
 	}
-    return 2;
-
 }
 
 /*
@@ -208,25 +197,25 @@ lpackrequest(lua_State *L) {
 		string msg
 		boolean padding
  */
+
 static inline uint32_t
 unpack_uint32(const uint8_t * buf) {
-    return buf[0] | buf[1]<<8 | buf[2]<<16 | buf[3]<<24;
+	return buf[0] | buf[1]<<8 | buf[2]<<16 | buf[3]<<24;
 }
 
 static int
 unpackreq_number(lua_State *L, const uint8_t * buf, int sz) {
-    if (sz < 9) {
-        return luaL_error(L, "Invalid cluster message (size=%d)",sz);
-    }
-    uint32_t address = unpack_uint32(buf+1);
-    uint32_t session = unpack_uint32(buf+5);
-    lua_pushinteger(L, address);
-    lua_pushinteger(L, session);
-    lua_pushlstring(L, (const char *)buf+9, sz-9);
-    
-    return 3;
-}
+	if (sz < 9) {
+		return luaL_error(L, "Invalid cluster message (size=%d)", sz);
+	}
+	uint32_t address = unpack_uint32(buf+1);
+	uint32_t session = unpack_uint32(buf+5);
+	lua_pushinteger(L, address);
+	lua_pushinteger(L, session);
+	lua_pushlstring(L, (const char *)buf+9, sz-9);
 
+	return 3;
+}
 
 static int
 unpackmreq_number(lua_State *L, const uint8_t * buf, int sz) {
@@ -243,6 +232,7 @@ unpackmreq_number(lua_State *L, const uint8_t * buf, int sz) {
 
 	return 4;
 }
+
 static int
 unpackmreq_part(lua_State *L, const uint8_t * buf, int sz) {
 	if (sz < 5) {
@@ -273,12 +263,7 @@ unpackreq_string(lua_State *L, const uint8_t * buf, int sz) {
 	lua_pushlstring(L, (const char *)buf+2+namesz+4, sz - namesz - 6);
 
 	return 3;
-
 }
-
-
-
-
 
 static int
 unpackmreq_string(lua_State *L, const uint8_t * buf, int sz) {
@@ -301,7 +286,7 @@ unpackmreq_string(lua_State *L, const uint8_t * buf, int sz) {
 
 static int
 lunpackrequest(lua_State *L) {
-   	size_t ssz;
+	size_t ssz;
 	const char *msg = luaL_checklstring(L,1,&ssz);
 	int sz = (int)ssz;
 	switch (msg[0]) {
@@ -344,7 +329,7 @@ lunpackrequest(lua_State *L) {
  */
 static int
 lpackresponse(lua_State *L) {
-    	uint32_t session = (uint32_t)luaL_checkinteger(L,1);
+	uint32_t session = (uint32_t)luaL_checkinteger(L,1);
 	// clusterd.lua:command.socket call lpackresponse,
 	// and the msg/sz is return by mtask.rawcall , so don't free(msg)
 	int ok = lua_toboolean(L,2);
@@ -421,7 +406,7 @@ lpackresponse(lua_State *L) {
  */
 static int
 lunpackresponse(lua_State *L) {
-    size_t sz;
+	size_t sz;
 	const char * buf = luaL_checklstring(L, 1, &sz);
 	if (sz < 5) {
 		return 0;
@@ -456,6 +441,7 @@ lunpackresponse(lua_State *L) {
 		return 0;
 	}
 }
+
 static int
 lconcat(lua_State *L) {
 	if (!lua_istable(L,1))
@@ -491,16 +477,16 @@ lconcat(lua_State *L) {
 
 int
 luaopen_cluster_core(lua_State *L) {
-    luaL_Reg l[] = {
-        { "packrequest", lpackrequest },
-        { "unpackrequest", lunpackrequest },
-        { "packresponse", lpackresponse },
-        { "unpackresponse", lunpackresponse },
+	luaL_Reg l[] = {
+		{ "packrequest", lpackrequest },
+		{ "unpackrequest", lunpackrequest },
+		{ "packresponse", lpackresponse },
+		{ "unpackresponse", lunpackresponse },
 		{ "concat", lconcat },
-        {NULL,NULL},
-    };
-    luaL_checkversion(L);
-    luaL_newlib(L, l);
-    
-    return 1;
+		{ NULL, NULL },
+	};
+	luaL_checkversion(L);
+	luaL_newlib(L,l);
+
+	return 1;
 }
