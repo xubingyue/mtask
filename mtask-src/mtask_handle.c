@@ -267,7 +267,7 @@ mtask_handle_init(int harbor) {
     memset(s->slot, 0, s->slot_size *sizeof(struct mtask_context*));
     
     rwlock_init(&s->lock);
-    
+    // reserve 0 for system
     s->harbor = (uint32_t)(harbor & 0xff) << HANDLE_REMOTE_SHIFT;
     s->handle_index = 1;
     s->name_cap = 2;

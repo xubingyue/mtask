@@ -8,10 +8,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
+
 #include <string.h>
 #include <signal.h>
-
+#include <assert.h>
 #include <lua.h>
 #include <lualib.h>
 #include <lauxlib.h>
@@ -22,17 +22,7 @@
 #include "mtask_server.h"
 
 
-static const char * load_config = "\
-    local config_name = ...\
-    local f = assert(io.open(config_name))\
-    local code = assert(f:read \'*a\')\
-    local function getenv(name) return assert(os.getenv(name), name) end\
-    code = string.gsub(code, \'%$([%w_%d]+)\', getenv)\
-    f:close()\
-    local result = {}\
-    assert(load(code,\'=(load)\',\'t\',result))()\
-    return result\
-";
+
 
 
 
@@ -74,11 +64,11 @@ _init_env(lua_State *L) {
         const char *key = lua_tostring(L, -2);
         if(lua_type(L, -1) == LUA_TBOOLEAN) {
             int b = lua_toboolean(L, -1);
-            mtask_setenv(key, b ? "true" : "fasle");
+            mtask_setenv(key, b ? "true" : "false");
         } else {
             const char *value = lua_tostring(L, -1);
             if(value == NULL) {
-                fprintf(stderr, "Invalid table \n");
+                fprintf(stderr, "Invalid config table key = %s\n", key);
                 exit(1);
             }
             mtask_setenv(key, value);
@@ -96,6 +86,17 @@ sigign() {
     return 0;
 }
 
+static const char * load_config = "\
+	local config_name = ...\
+	local f = assert(io.open(config_name))\
+	local code = assert(f:read \'*a\')\
+	local function getenv(name) return assert(os.getenv(name), \'os.getenv() failed: \' .. name) end\
+	code = string.gsub(code, \'%$([%w_%d]+)\', getenv)\
+	f:close()\
+	local result = {}\
+	assert(load(code,\'=(load)\',\'t\',result))()\
+	return result\
+";
 int
 main(int argc, char *argv[]) {
     const char *config_file = NULL;
