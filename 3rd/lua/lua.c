@@ -593,8 +593,6 @@ static int pmain (lua_State *L) {
   return 1;
 }
 
-
-
 #ifdef LUA_DEBUG
 int mainlua (int argc, char **argv) {
 #else
