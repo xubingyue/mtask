@@ -24,7 +24,6 @@
 #include "mtask_timer.h"
 #include "mtask_socket.h"
 #include "mtask_daemon.h"
-
 /*
  为了防止竞争,条件锁的使用总是和一个互斥锁结合在一起.
  条件锁是用来线程通讯的,但是互斥锁是为了保护这种通讯不会产生逻辑错误,可以正常工作.
@@ -111,6 +110,7 @@ thread_monitor(void *p) {
     }
     return NULL;
 }
+
 static void *
 thread_timer(void *p) {
     struct monitor *m = p;
