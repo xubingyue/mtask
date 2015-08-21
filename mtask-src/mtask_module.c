@@ -157,10 +157,10 @@ void *
 mtask_module_instance_create(struct mtask_module*m) {
     if(m->create){
        return m->create();
-    }
-    else{
+    } else {
         return (void *)(intptr_t)(~0);
     }
+    
 }
 /*init  Lua module callback function */
 int

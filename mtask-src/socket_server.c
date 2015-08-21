@@ -12,11 +12,13 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <stdbool.h>
+#include <stdio.h>
+
 #include <stdint.h>
-#include <string.h>
+
 #include <assert.h>
+#include <string.h>
 
 #include "mtask.h"
 #include "socket_server.h"
@@ -24,8 +26,9 @@
 #include "mtask_atomic.h"
 
 #define MAX_INFO            128
-#define MAX_EVENT           64  
+// MAX_SOCKET will be 2^MAX_SOCKET_P
 #define MAX_SOCKET_P        16
+#define MAX_EVENT           64  
 #define MIN_READ_BUFFER     64
 
 #define SOCKET_TYPE_INVALID 0

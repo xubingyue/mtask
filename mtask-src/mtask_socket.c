@@ -12,13 +12,10 @@
 
 #include "mtask.h"
 #include "mtask_socket.h"
+#include "socket_server.h"
 #include "mtask_server.h"
 #include "mtask_mq.h"
 #include "mtask_harbor.h"
-
-#include "socket_server.h"
-
-
 static struct socket_server *SOCKET_SERVER = NULL;
 
 

@@ -9,11 +9,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "mtask_monitor.h"
-#include "mtask.h"
-#include "mtask_server.h"
-#include "mtask_atomic.h"
 
+#include "mtask.h"
+#include "mtask_monitor.h"
+#include "mtask_server.h"
+
+#include "mtask_atomic.h"
 struct mtask_monitor {
     int version;        /*curr ver*/
     int check_version;  /*old ver*/

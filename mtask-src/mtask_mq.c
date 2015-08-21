@@ -12,9 +12,10 @@
 #include <assert.h>
 #include <stdbool.h>
 
+
+#include "mtask.h"
 #include "mtask_mq.h"
 #include "mtask_handle.h"
-#include "mtask.h"
 #include "mtask_spinlock.h"
 
 #define DEFAULT_QUEUE_SIZE 64
@@ -72,7 +73,7 @@ mtask_globalmq_push(struct message_queue *queue) {
 
 
 struct message_queue *
-mtask_globalmq_pop(void) {
+mtask_globalmq_pop() {
     struct global_queue *q = Q;
     
     SPIN_LOCK(q)
@@ -119,6 +120,7 @@ mtask_mq_create(uint32_t handle) {
 static void
 _release(struct message_queue *q) {
     assert(q->next == NULL);
+	SPIN_DESTROY(q)
     mtask_free(q->queue);
     mtask_free(q);
 }
@@ -267,7 +269,7 @@ mtask_mq_mark_release(struct message_queue *q) {
 static void
 _drop_queue(struct message_queue *q,message_drop drop_func,void *ud) {
     struct mtask_message msg;
-    while (!mtask_mq_pop) {
+    while (!mtask_mq_pop(q,&msg)) {
         drop_func(&msg,ud);
     }
     _release(q);
@@ -285,22 +287,3 @@ mtask_mq_release(struct message_queue *q,message_drop drop_func,void *ud) {
         SPIN_UNLOCK(q)
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

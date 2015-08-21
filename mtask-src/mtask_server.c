@@ -17,15 +17,17 @@
 #include "mtask.h"
 #include "mtask_server.h"
 #include "mtask_module.h"
-#include "mtask_mq.h"
 #include "mtask_handle.h"
-#include "mtask_harbor.h"
-#include "mtask_monitor.h"
+#include "mtask_mq.h"
 #include "mtask_timer.h"
+#include "mtask_harbor.h"
+#include "mtask_env.h"
+#include "mtask_monitor.h"
 #include "mtask_imp.h"
 #include "mtask_log.h"
-#include "mtask_atomic.h"
 #include "mtask_spinlock.h"
+#include "mtask_atomic.h"
+
 
 #ifdef CALLING_CHECK
 
@@ -127,7 +129,7 @@ drop_message(struct mtask_message *msg,void *ud) {
     mtask_free(msg->data);
     uint32_t source = d->handle;
     assert(source);
-    
+    // report error to the message source
     mtask_send(NULL, source, msg->source, PTYPE_ERROR, 0, NULL, 0);
 }
 
@@ -770,7 +772,7 @@ _filter_args(struct mtask_context *ctx,int type,int *session,void **data, size_t
  */
 int
 mtask_send(struct mtask_context *ctx,uint32_t source,uint32_t dst,int type,int session,void *data,size_t sz) {
-    if((sz & HANDLE_MASK) != sz) {
+    if((sz & MESSAGE_TYPE_MASK) != sz) {
         mtask_error(ctx, "message to %x is too large (sz = %lu)",dst,sz);
         mtask_free(data);
         return -1;

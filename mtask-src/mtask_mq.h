@@ -10,7 +10,7 @@
 #define __mtask__mtask_mq__
 
 #include <stdlib.h>
-#include <stdlib.h>
+#include <stdint.h>
 
 struct mtask_message {
     uint32_t source;   /*source of module*/
