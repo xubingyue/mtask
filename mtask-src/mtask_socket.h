@@ -39,15 +39,15 @@ int mtask_socket_send(struct mtask_context *ctx, int id,void *buffer,int sz);
 
 void mtask_socket_send_lowpriority(struct mtask_context *ctx,int id, void *buffer, int sz);
 
-void mtask_socket_close(struct mtask_context *ctx,int id);
-
-void mtask_socket_start(struct mtask_context *ctx,int id);
-
 int mtask_socket_listen(struct mtask_context *ctx,const char *host, int port, int backlog);
 
 int mtask_socket_connect(struct mtask_context *ctx,const char *host,int port);
 
 int mtask_socket_bind(struct mtask_context *ctx,int fd);
+
+void mtask_socket_close(struct mtask_context *ctx,int id);
+
+void mtask_socket_start(struct mtask_context *ctx,int id);
 
 void mtask_socket_nodelay(struct mtask_context *ctx,int id);
 

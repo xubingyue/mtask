@@ -44,10 +44,7 @@ struct worker_parm {
     int weight;  /*the  weight*/
 };
 
-
 #define CHECK_ABORT if(mtask_context_total()==0) break;
-
-
 
 static void
 create_thread(pthread_t *thread,void *(*start_routine) (void*),void *arg) {
@@ -65,8 +62,6 @@ wakeup(struct monitor *m,int busy) {
         pthread_cond_signal(&m->cond);
     }
 }
-
-
 
 /*socket threads function*/
 static void *
@@ -130,7 +125,7 @@ thread_timer(void *p) {
     }
     // signal sleep worker, "spurious wakeup" is harmless
     mtask_socket_exit();
-// wakeup all worker thread	
+    // wakeup all worker thread
     pthread_mutex_lock(&m->mutex);
     m->quit = 1;
     pthread_cond_broadcast(&m->cond);
@@ -156,7 +151,7 @@ thread_worker(void *p) {
             if (pthread_mutex_lock(&m->mutex) == 0) {
 				++ m->sleep;		
 			    // "spurious wakeup" is harmless,
-				// because skynet_context_message_dispatch() can be call at any time.
+				// because mtask_context_message_dispatch() can be call at any time.
 				
                 if (!m->quit) {
                     pthread_cond_wait(&m->cond, &m->mutex);
@@ -178,10 +173,6 @@ thread_worker(void *p) {
     }
     return NULL;
 }
-
-
-
-
 
 static void
 start(int thread) {
@@ -252,6 +243,7 @@ bootstrap(struct mtask_context *logger,const char *cmdline) {
         exit(1);
     }
 }
+
 void
 mtask_start(struct mtask_config *config) {
     if(config->daemon) {

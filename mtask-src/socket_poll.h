@@ -21,9 +21,11 @@ struct event {
     bool write;
 };
 
+static bool sp_invalid(poll_fd fd);
+
 static poll_fd sp_create();
 
-static bool sp_invalid(poll_fd fd);
+static void sp_release(poll_fd fd);
 
 static int sp_add(poll_fd fd,int sock,void *ud);
 
@@ -35,7 +37,6 @@ static int sp_wait(poll_fd fd,struct event *e,int max);
 
 static void sp_nonblocking(int sock);
 
-static void sp_release(poll_fd fd);
 
 
 //实现在下面,根据平台的不同包含不同的实现代码

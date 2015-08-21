@@ -21,7 +21,7 @@
 
 struct socket_server;
 
-struct socket_udp_address;
+
 
 
 struct socket_message {
@@ -31,36 +31,34 @@ struct socket_message {
     char *data;         /*payload*/
 };
 
-struct socket_object_interface {
-    void *(*buffer)(void *);
-    int (*size)(void *);
-    void (*free)(void *);
-};
 
 struct socket_server * socket_server_create();
 
-void socket_server_exit(struct socket_server *ss);
-
-void socket_server_start(struct socket_server *ss,uintptr_t opaque,int id);
-
-void socket_server_close(struct socket_server *ss,uintptr_t opaque,int id);
-
-int socket_server_poll(struct socket_server *, struct socket_message *result, int *more);
-
-int64_t socket_server_send(struct socket_server *ss, int id,const void *buffer,int sz);
 
 void socket_server_release(struct socket_server *ss);
 
-int socket_server_listen(struct socket_server *ss,uint32_t opaque,const char *addr,int port,int backlog);
+
+
+int socket_server_poll(struct socket_server *, struct socket_message *result, int *more);
+
+void socket_server_exit(struct socket_server *ss);
+void socket_server_close(struct socket_server *ss,uintptr_t opaque,int id);
+
+void socket_server_start(struct socket_server *ss,uintptr_t opaque,int id);
+
+
+int64_t socket_server_send(struct socket_server *ss, int id,const void *buffer,int sz);
+void socket_server_send_lowpriority(struct socket_server *ss, int id, const void * buffer, int sz);
+
+int socket_server_listen(struct socket_server *ss,uintptr_t opaque,const char *addr,int port,int backlog);
 
 int socket_server_connect(struct socket_server *ss,uintptr_t opaque,const char * addr, int port);
-
-void socket_server_send_lowpriority(struct socket_server *ss, int id, const void * buffer, int sz);
 
 int socket_server_bind(struct socket_server *ss ,uintptr_t opaque, int fd);
 
 void socket_server_nodelay(struct socket_server *ss,int id);
 
+struct socket_udp_address;
 int socket_server_udp(struct socket_server *ss ,uintptr_t opaque, const char * addr, int port);
 
 int socket_server_udp_connect(struct socket_server *ss, int id, const char * addr, int port);
@@ -69,5 +67,12 @@ int64_t socket_server_udp_send(struct socket_server *, int id, const struct sock
 
 const struct socket_udp_address *socket_server_udp_address(struct socket_server *ss ,struct socket_message *msg,int *addrsz);
 
+struct socket_object_interface {
+    void *(*buffer)(void *);
+    int (*size)(void *);
+    void (*free)(void *);
+};
 
+// if you send package sz == -1, use soi.
+void socket_server_userobject(struct socket_server *, struct socket_object_interface *soi);
 #endif /* defined(__mtask__socket_server__) */
