@@ -19,7 +19,7 @@
 #include <arpa/inet.h>
 
 #include "mtask_socket.h"
-#include "mtask.h"
+#include "mtask_malloc.h"
 
 
 #define BACKLOG  32  /*2 ^ 12 = 4096*/
@@ -58,74 +58,6 @@ lfreepool(lua_State *L) {
 }
 
 static int
-lnewbuffer(lua_State *L) {
-    struct socket_buffer *sb =lua_newuserdata(L, sizeof(*sb));
-    sb->size = 0;
-    sb->offset = 0 ;
-    sb->head = NULL;
-    sb->tail = NULL;
-    
-    return 1;
-}
-
-static const char *
-address_port(lua_State *L,char *tmp,const char *addr,int port_index,int *port) {
-    const char *host;
-    if (lua_isnoneornil(L, port_index)) {
-        host = strchr(addr, '[');
-        /*is ipv6*/
-        if (host) {
-            ++host;
-            const char *sep = strchr(addr, ']');
-            if (sep == NULL) {
-                luaL_error(L, "Invalid address %s.",addr);
-            }
-            memcpy(tmp, host, sep - host);
-            tmp[sep-host] = '\0';
-            host = tmp;
-            sep = strchr(sep+1, ':');
-            if (sep == NULL) {
-                luaL_error(L, "Invalid address %s.",addr);
-            }
-            *port = strtoul(sep+1,NULL,10);
-        } else {          /*is ipv4*/
-            const char *sep = strchr(addr, ':');
-            if (sep == NULL) {
-                luaL_error(L, "Invalid address %s.",addr);
-            }
-            memcpy(tmp, addr, sep-addr);
-            tmp[sep-addr] = '\0';
-            host = tmp;
-            *port = strtoul(sep+1,NULL,10);
-        }
-    } else {
-        host = addr;
-        *port = luaL_optinteger(L, port_index, 0);
-    }
-    return host;
-}
-
-
-static int
-lconnect(lua_State *L) {
-    size_t sz = 0;
-    const char *addr = luaL_checklstring(L, 1, &sz);
-    char tmp[sz];
-    int port = 0;
-    
-    const char *host = address_port(L,tmp,addr,2,&port);
-    if (port == 0) {
-        return luaL_error(L, "Invalid port");
-    }
-    
-    struct mtask_context *ctx = lua_touserdata(L, lua_upvalueindex(1));
-    int id = mtask_socket_connect(ctx, host, port);
-    lua_pushinteger(L, id);
-    
-    return 1;
-}
-
-static int
 lnewpool(lua_State *L,int sz) {
     struct buffer_node *pool = lua_newuserdata(L, sizeof(*pool));
     int i;
@@ -144,6 +76,34 @@ lnewpool(lua_State *L,int sz) {
 }
 
 static int
+lnewbuffer(lua_State *L) {
+	struct socket_buffer * sb = lua_newuserdata(L, sizeof(*sb));	
+	sb->size = 0;
+	sb->offset = 0;
+	sb->head = NULL;
+	sb->tail = NULL;
+	
+	return 1;
+}
+
+static int
+/*
+	userdata send_buffer
+	table pool
+	lightuserdata msg
+	int size
+
+	return size
+
+	Comment: The table pool record all the buffers chunk, 
+	and the first index [1] is a lightuserdata : free_node. We can always use this pointer for struct buffer_node .
+	The following ([2] ...)  userdatas in table pool is the buffer chunk (for struct buffer_node), 
+	we never free them until the VM closed. The size of first chunk ([2]) is 8 struct buffer_node,
+	and the second size is 16 ... The largest size of chunk is LARGE_PAGE_NODE (4096)
+
+	lpushbbuffer will get a free struct buffer_node from table pool, and then put the msg/size in it.
+	lpopbuffer return the struct buffer_node back to table pool (By calling return_free_node).
+ */
 lpushbuffer(lua_State *L) {
     struct socket_buffer *sb = lua_touserdata(L, 1);
     if (sb == NULL) {
@@ -261,6 +221,31 @@ pop_lstring(lua_State *L,struct socket_buffer *sb,int sz,int skip) {
     luaL_pushresult(&b);
 }
 
+
+static int
+lheader(lua_State *L) {
+    size_t len;
+    const uint8_t *s = (const uint8_t *)luaL_checklstring(L, 1, &len);
+    if (len >4 || len <1) {
+        return luaL_error(L, "Invalid read %s",s);
+    }
+    int i;
+    size_t sz=0;
+    for (i=0; i<(int)len; i++) {
+        sz <<= 8;
+        sz |= s[i];
+    }
+    lua_pushinteger(L, (lua_Integer)sz);
+    
+    return 1;
+}
+
+
+/*
+	userdata send_buffer
+	table pool
+	integer sz 
+ */
 static int
 lpopbuffer(lua_State *L) {
     struct socket_buffer *sb = lua_touserdata(L, 1);
@@ -280,182 +265,33 @@ lpopbuffer(lua_State *L) {
     return 2;
 }
 
-static int
-lclose(lua_State *L) {
-    int id = luaL_checkinteger(L, 1);
-    struct mtask_context *ctx = lua_touserdata(L, lua_upvalueindex(1));
-    mtask_socket_close(ctx, id);
-    return 0;
-}
+/*
+	userdata send_buffer
+	table pool
+ */
 
 static int
-llisten(lua_State *L) {
-    const char *host = luaL_checkstring(L, 1);
-    int port = luaL_checkinteger(L, 2);
-    int backlog = luaL_optinteger(L, 3, BACKLOG);
-    
-    struct mtask_context *ctx = lua_touserdata(L, lua_upvalueindex(1));
-    int id = mtask_socket_listen(ctx, host, port, backlog);
-    
-    if (id<0) {
-        return luaL_error(L, "Listen error");
+lclearbuffer(lua_State *L) {
+    struct socket_buffer *sb = lua_touserdata(L, 1);
+    if (sb ==NULL) {
+        return luaL_error(L, "Need buffer object at parm 1");
     }
-    lua_pushinteger(L, id);
-    return 1;
-}
-
-static void *
-get_buffer(lua_State *L,int index,int *sz) {
-    void *buffer;
-    if (lua_isuserdata(L, index)) {
-        buffer = lua_touserdata(L, index);
-        *sz = luaL_checkinteger(L, index+1);
-    } else {
-        size_t len =0;
-        const char *str = luaL_checklstring(L, index, &len);
-        buffer = mtask_malloc(len);
-        memcpy(buffer, str, len);
-        *sz = (int)len;
+    luaL_checktype(L, 2, LUA_TTABLE);
+    while (sb->head) {
+        return_free_node(L, 2, sb);
     }
-    return buffer;
-}
-/*把一个字符串置入正常的写队列，mtask 框架会在 socket 可写时发送它。*/
-static int
-lsend(lua_State *L) {
-    struct mtask_context *ctx = lua_touserdata(L, lua_upvalueindex(1));
-    int id = luaL_checkinteger(L, 1);
-    int sz=0;
-    
-    void *buffer =get_buffer(L,2,&sz);
-    int err = mtask_socket_send(ctx, id, buffer, sz);
-    lua_pushboolean(L, !err);
-    return 1;
-}
-/*把字符串写入低优先级队列。如果正常的写队列还有写操作未完成时，低优先级队列上的数据永远不会被发出。只有在正常写队列为空时，才会处理低优先级队列。但是，每次写的字符串都可以看成原子操作。不会只发送一半，然后转去发送正常写队列的数据。*/
-static int
-lsendlow(lua_State *L) {
-    struct mtask_context *ctx = lua_touserdata(L, lua_upvalueindex(1));
-    int id = luaL_checkinteger(L, 1);
-    int sz =0;
-    void *buffer = get_buffer(L, 2, &sz);
-    mtask_socket_send(ctx, id, buffer, sz);
-    return 0;
-}
-
-static int
-lbind(lua_State *L) {
-    struct mtask_context *ctx = lua_touserdata(L, lua_upvalueindex(1));
-    int fd = luaL_checkinteger(L, 1);
-    int id = mtask_socket_bind(ctx, fd);
-    lua_pushinteger(L, id);
-    return 1;
-}
-
-static int
-lstart(lua_State *L) {
-    struct mtask_context *ctx = lua_touserdata(L, lua_upvalueindex(1));
-    int id = luaL_checkinteger(L, 1);
-    mtask_socket_start(ctx, id);
-    return 0;
-}
-
-static int
-lnodelay(lua_State *L) {
-    struct mtask_context *ctx = lua_touserdata(L, lua_upvalueindex(1));
-    int id = luaL_checkinteger(L, 1);
-    mtask_socket_nodelay(ctx, id);
-    
+    sb->size = 0;
     return 0;
 }
 
 
-static int
-ludp(lua_State *L) {
-    struct mtask_context *ctx = lua_touserdata(L, lua_upvalueindex(1));
-    size_t sz =0;
-    const char *addr = lua_tolstring(L, 1, &sz);
-    char tmp[sz];
-    int port = 0;
-    const char *host = NULL;
-    if (addr) {
-        host = address_port(L, tmp, addr, 2, &port);
-    }
-    
-    int id = mtask_socket_udp(ctx,host,port);
-    if (id<0) {
-        return luaL_error(L, "udp init failed");
-    }
-    lua_pushinteger(L, id);
-    return 1;
-}
 
-static int
-ludp_connect(lua_State *L) {
-    struct mtask_context *ctx = lua_touserdata(L, lua_upvalueindex(1));
-    int id = luaL_checkinteger(L, 1);
-    size_t sz = 0;
-    const char *addr = luaL_checklstring(L, 2, &sz);
-    char tmp[sz];
-    int port =0;
-    
-    const char *host = NULL;
-    if ( addr) {
-        host = address_port(L, tmp, addr, 3, &port);
-    }
-    
-    if (mtask_socket_udp_connect(ctx, id, addr, port)) {
-        return luaL_error(L, "udp connect failed");
-    }
-    return 0;
-}
 
-static int
-ludp_send(lua_State *L) {
-    struct mtask_context *ctx =lua_touserdata(L, lua_upvalueindex(1));
-    int id = luaL_checkinteger(L, 1);
-    const char *address = luaL_checkstring(L, 2);
-    int sz = 0;
-    
-    void *buffer = get_buffer(L, 3, &sz);
-    int err = mtask_socket_udp_send(ctx, id,address, buffer, sz);
-    lua_pushboolean(L, !err);
-    return 1;
-}
 
-static int
-ludp_address(lua_State *L) {
-    size_t sz = 0;
-    const uint8_t *addr = (const uint8_t *)luaL_checklstring(L, 1, &sz);
-    uint16_t port = 0;
-    memcpy(&port, addr+1, sizeof(uint16_t));
-    port = ntohs(port);
-    const void *src = addr +3;
-    char tmp[256];
-    int family;
-    
-    if (sz==1+2+4) {
-        family=AF_INET;
-    } else {
-        if (sz != 1+2+16) {
-            return luaL_error(L, "Invalid udp address");
-        }
-        family = AF_INET6;
-    }
-    if (inet_ntop(family, src, tmp, sizeof(tmp))) {
-        return luaL_error(L, "Invalid udp address");
-    }
-    lua_pushstring(L, tmp);
-    lua_pushinteger(L, port);
-    return 2;
-}
 
-static int
-ldrop(lua_State *L) {
-    void *msg = lua_touserdata(L, 1);
-    luaL_checkinteger(L, 2);
-    mtask_free(msg);
-    return 0;
-}
+
+
+
 
 static int
 lreadall(lua_State *L) {
@@ -479,18 +315,13 @@ lreadall(lua_State *L) {
 }
 
 static int
-lclearbuffer(lua_State *L) {
-    struct socket_buffer *sb = lua_touserdata(L, 1);
-    if (sb ==NULL) {
-        return luaL_error(L, "Need buffer object at parm 1");
-    }
-    luaL_checktype(L, 2, LUA_TTABLE);
-    while (sb->head) {
-        return_free_node(L, 2, sb);
-    }
-    sb->size = 0;
+ldrop(lua_State *L) {
+    void *msg = lua_touserdata(L, 1);
+    luaL_checkinteger(L, 2);
+    mtask_free(msg);
     return 0;
 }
+
 
 static bool
 check_sep(struct buffer_node *node,int from,const char *sep,int seplen) {
@@ -567,23 +398,6 @@ lstr2p(lua_State *L) {
     return 2;
 }
 
-static int
-lheader(lua_State *L) {
-    size_t len;
-    const uint8_t *s = (const uint8_t *)luaL_checklstring(L, 1, &len);
-    if (len >4 || len <1) {
-        return luaL_error(L, "Invalid read %s",s);
-    }
-    int i;
-    size_t sz=0;
-    for (i=0; i<(int)len; i++) {
-        sz <<= 8;
-        sz |= s[i];
-    }
-    lua_pushinteger(L, (lua_Integer)sz);
-    
-    return 1;
-}
 
 static int
 lunpack(lua_State *L) {
@@ -611,9 +425,230 @@ lunpack(lua_State *L) {
     return 4;
 }
 
+static const char *
+address_port(lua_State *L,char *tmp,const char *addr,int port_index,int *port) {
+    const char *host;
+    if (lua_isnoneornil(L, port_index)) {
+        host = strchr(addr, '[');
+        /*is ipv6*/
+        if (host) {
+            ++host;
+            const char *sep = strchr(addr, ']');
+            if (sep == NULL) {
+                luaL_error(L, "Invalid address %s.",addr);
+            }
+            memcpy(tmp, host, sep - host);
+            tmp[sep-host] = '\0';
+            host = tmp;
+            sep = strchr(sep+1, ':');
+            if (sep == NULL) {
+                luaL_error(L, "Invalid address %s.",addr);
+            }
+            *port = strtoul(sep+1,NULL,10);
+        } else {          /*is ipv4*/
+            const char *sep = strchr(addr, ':');
+            if (sep == NULL) {
+                luaL_error(L, "Invalid address %s.",addr);
+            }
+            memcpy(tmp, addr, sep-addr);
+            tmp[sep-addr] = '\0';
+            host = tmp;
+            *port = strtoul(sep+1,NULL,10);
+        }
+    } else {
+        host = addr;
+        *port = luaL_optinteger(L, port_index, 0);
+    }
+    return host;
+}
 
+
+
+static int
+lconnect(lua_State *L) {
+    size_t sz = 0;
+    const char *addr = luaL_checklstring(L, 1, &sz);
+    char tmp[sz];
+    int port = 0;
+    
+    const char *host = address_port(L,tmp,addr,2,&port);
+    if (port == 0) {
+        return luaL_error(L, "Invalid port");
+    }
+    
+    struct mtask_context *ctx = lua_touserdata(L, lua_upvalueindex(1));
+    int id = mtask_socket_connect(ctx, host, port);
+    lua_pushinteger(L, id);
+    
+    return 1;
+}
+static int
+lclose(lua_State *L) {
+    int id = luaL_checkinteger(L, 1);
+    struct mtask_context *ctx = lua_touserdata(L, lua_upvalueindex(1));
+    mtask_socket_close(ctx, id);
+    return 0;
+}
+
+static int
+llisten(lua_State *L) {
+    const char *host = luaL_checkstring(L, 1);
+    int port = luaL_checkinteger(L, 2);
+    int backlog = luaL_optinteger(L, 3, BACKLOG);
+    
+    struct mtask_context *ctx = lua_touserdata(L, lua_upvalueindex(1));
+    int id = mtask_socket_listen(ctx, host, port, backlog);
+    
+    if (id<0) {
+        return luaL_error(L, "Listen error");
+    }
+    lua_pushinteger(L, id);
+    return 1;
+}
+
+static void *
+get_buffer(lua_State *L,int index,int *sz) {
+    void *buffer;
+    if (lua_isuserdata(L, index)) {
+        buffer = lua_touserdata(L, index);
+        *sz = luaL_checkinteger(L, index+1);
+    } else {
+        size_t len =0;
+        const char *str = luaL_checklstring(L, index, &len);
+        buffer = mtask_malloc(len);
+        memcpy(buffer, str, len);
+        *sz = (int)len;
+    }
+    return buffer;
+}
+/*把一个字符串置入正常的写队列，mtask 框架会在 socket 可写时发送它。*/
+static int
+lsend(lua_State *L) {
+    struct mtask_context *ctx = lua_touserdata(L, lua_upvalueindex(1));
+    int id = luaL_checkinteger(L, 1);
+    int sz=0;
+    
+    void *buffer =get_buffer(L,2,&sz);
+    int err = mtask_socket_send(ctx, id, buffer, sz);
+    lua_pushboolean(L, !err);
+    return 1;
+}
+/*把字符串写入低优先级队列。如果正常的写队列还有写操作未完成时，低优先级队列上的数据永远不会被发出。只有在正常写队列为空时，才会处理低优先级队列。但是，每次写的字符串都可以看成原子操作。不会只发送一半，然后转去发送正常写队列的数据。*/
+static int
+lsendlow(lua_State *L) {
+    struct mtask_context *ctx = lua_touserdata(L, lua_upvalueindex(1));
+    int id = luaL_checkinteger(L, 1);
+    int sz =0;
+    void *buffer = get_buffer(L, 2, &sz);
+    mtask_socket_send_lowpriority(ctx, id, buffer, sz);
+    return 0;
+}
+
+static int
+lbind(lua_State *L) {
+    struct mtask_context *ctx = lua_touserdata(L, lua_upvalueindex(1));
+    int fd = luaL_checkinteger(L, 1);
+    int id = mtask_socket_bind(ctx, fd);
+    lua_pushinteger(L, id);
+    return 1;
+}
+
+static int
+lstart(lua_State *L) {
+    struct mtask_context *ctx = lua_touserdata(L, lua_upvalueindex(1));
+    int id = luaL_checkinteger(L, 1);
+    mtask_socket_start(ctx, id);
+    return 0;
+}
+
+static int
+lnodelay(lua_State *L) {
+    struct mtask_context *ctx = lua_touserdata(L, lua_upvalueindex(1));
+    int id = luaL_checkinteger(L, 1);
+    mtask_socket_nodelay(ctx, id);
+    
+    return 0;
+}
+static int
+ludp(lua_State *L) {
+    struct mtask_context *ctx = lua_touserdata(L, lua_upvalueindex(1));
+    size_t sz =0;
+    const char *addr = lua_tolstring(L, 1, &sz);
+    char tmp[sz];
+    int port = 0;
+    const char *host = NULL;
+    if (addr) {
+        host = address_port(L, tmp, addr, 2, &port);
+    }
+    
+    int id = mtask_socket_udp(ctx,host,port);
+    if (id<0) {
+        return luaL_error(L, "udp init failed");
+    }
+    lua_pushinteger(L, id);
+    return 1;
+}
+
+static int
+ludp_connect(lua_State *L) {
+    struct mtask_context *ctx = lua_touserdata(L, lua_upvalueindex(1));
+    int id = luaL_checkinteger(L, 1);
+    size_t sz = 0;
+    const char *addr = luaL_checklstring(L, 2, &sz);
+    char tmp[sz];
+    int port =0;
+    
+    const char *host = NULL;
+    if ( addr) {
+        host = address_port(L, tmp, addr, 3, &port);
+    }
+    
+    if (mtask_socket_udp_connect(ctx, id, host, port)) {
+        return luaL_error(L, "udp connect failed");
+    }
+    return 0;
+}
+static int
+ludp_send(lua_State *L) {
+    struct mtask_context *ctx =lua_touserdata(L, lua_upvalueindex(1));
+    int id = luaL_checkinteger(L, 1);
+    const char *address = luaL_checkstring(L, 2);
+    int sz = 0;
+    
+    void *buffer = get_buffer(L, 3, &sz);
+    int err = mtask_socket_udp_send(ctx, id,address, buffer, sz);
+    lua_pushboolean(L, !err);
+    return 1;
+}
+static int
+ludp_address(lua_State *L) {
+    size_t sz = 0;
+    const uint8_t *addr = (const uint8_t *)luaL_checklstring(L, 1, &sz);
+    uint16_t port = 0;
+    memcpy(&port, addr+1, sizeof(uint16_t));
+    port = ntohs(port);
+    const void *src = addr +3;
+    char tmp[256];
+    int family;
+    
+    if (sz==1+2+4) {
+        family=AF_INET;
+    } else {
+        if (sz != 1+2+16) {
+            return luaL_error(L, "Invalid udp address");
+        }
+        family = AF_INET6;
+    }
+    if (inet_ntop(family, src, tmp, sizeof(tmp))==NULL) {
+        return luaL_error(L, "Invalid udp address");
+    }
+    lua_pushstring(L, tmp);
+    lua_pushinteger(L, port);
+    return 2;
+}
 int
 luaopen_sokcetdriver(lua_State *L) {
+	luaL_checkversion(L);
     luaL_Reg l[] = {
         {"buffer",lnewbuffer},
         {"push", lpushbuffer},
