@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "mtask.h"
+#include "mtask_malloc.h"
 
 #define OP_REPLY 1
 #define OP_MSG	1000

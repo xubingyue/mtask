@@ -9,16 +9,16 @@
 #include <lua.h>
 #include <lauxlib.h>
 
-#include <string.h>
 #include <stdlib.h>
-#include <assert.h>
+
 #include <stdint.h>
+#include <assert.h>
+#include <string.h>
 
 #include "mtask_malloc.h"
 
-#include "mtask_lua_seri.h"
 
-#define invalid_stream(L,rb) invalid_stream_line(L,rb,__LINE__)
+
 
 
 #define  TYPE_NIL           0
@@ -70,40 +70,6 @@ struct read_block {
     int ptr;
 };
 
-static void pack_one(lua_State *L, struct write_block *b, int index, int depth);
-
-static void unpack_one(lua_State *L, struct read_block *rb);
-
-static void
-wb_init(struct write_block *wb,struct block *b) {
-    wb->head = b;
-    assert(b->next == NULL);
-    wb->len = 0;
-    wb->current = wb->head;
-    wb->ptr = 0;
-}
-
-static void
-wb_free(struct write_block *wb) {
-    struct block *blk = wb->head;
-    blk = blk->next;/*the first block is on stack*/
-    while (blk) {
-        struct block *next = blk->next;
-        mtask_free(blk);
-        blk = next;
-    }
-    wb->head = NULL;
-    wb->current = NULL;
-    wb->ptr = 0;
-    wb->len = 0;
-}
-
-static inline void
-invalid_stream_line(lua_State *L, struct read_block *rb, int line) {
-    int len = rb->len;
-    luaL_error(L, "Invalid serialize stream %d (line:%d)", len, line);
-}
-
 inline static struct block *
 blk_alloc(void) {
     struct block *b = mtask_malloc(sizeof(struct block));
@@ -133,6 +99,53 @@ wb_push(struct write_block *b,const void *buf,int sz) {
         goto _again;
     }
 }
+
+
+static void
+wb_init(struct write_block *wb,struct block *b) {
+    wb->head = b;
+    assert(b->next == NULL);
+    wb->len = 0;
+    wb->current = wb->head;
+    wb->ptr = 0;
+}
+
+static void
+wb_free(struct write_block *wb) {
+    struct block *blk = wb->head;
+    blk = blk->next;/*the first block is on stack*/
+    while (blk) {
+        struct block *next = blk->next;
+        mtask_free(blk);
+        blk = next;
+    }
+    wb->head = NULL;
+    wb->current = NULL;
+    wb->ptr = 0;
+    wb->len = 0;
+}
+
+
+static void
+rball_init(struct read_block *rb,char *buffer,int size) {
+    rb->buffer = buffer;
+    rb->len = size;
+    rb->ptr = 0;
+}
+
+
+static void *
+rb_read(struct read_block *rb,int sz) {
+    if (rb->len < sz) {
+        return NULL;
+    }
+    int ptr = rb->ptr;
+    rb->ptr += sz;
+    rb->len -= sz;
+    
+    return rb->buffer + ptr;
+}
+
 
 
 static inline void
@@ -220,6 +233,8 @@ wb_string(struct write_block *wb, const char *str, int len) {
     }
 }
 
+
+static void pack_one(lua_State *L, struct write_block *b, int index, int depth);
 static int
 wb_table_array(lua_State *L, struct write_block * wb, int index, int depth) {
     int array_size = lua_rawlen(L,index);
@@ -351,23 +366,17 @@ static void
 pack_from(lua_State *L,struct write_block *b,int from) {
     int n = lua_gettop(L) - from;
     int i;
-    for (i=0; i<=n; i++) {
+    for (i=1; i<=n; i++) {
         pack_one(L, b, from+i,0);
     }
 }
-
-static void *
-rb_read(struct read_block *rb,int sz) {
-    if (rb->len < sz) {
-        return NULL;
-    }
-    int ptr = rb->ptr;
-    rb->ptr += sz;
-    rb->len -= sz;
-    
-    return rb->buffer + ptr;
+static inline void
+invalid_stream_line(lua_State *L, struct read_block *rb, int line) {
+    int len = rb->len;
+    luaL_error(L, "Invalid serialize stream %d (line:%d)", len, line);
 }
 
+#define invalid_stream(L,rb) invalid_stream_line(L,rb,__LINE__)
 
 static lua_Integer
 get_integer(lua_State *L, struct read_block *rb, int cookie) {
@@ -444,6 +453,7 @@ get_buffer(lua_State *L, struct read_block *rb, int len) {
     lua_pushlstring(L,p,len);
 }
 
+static void unpack_one(lua_State *L, struct read_block *rb);
 
 static void
 unpack_table(lua_State *L, struct read_block *rb, int array_size) {
@@ -566,29 +576,10 @@ seri(lua_State *L, struct block *b, int len) {
     lua_pushinteger(L, sz);
 }
 
-static void
-rball_init(struct read_block *rb,char *buffer,int size) {
-    rb->buffer = buffer;
-    rb->len = size;
-    rb->ptr = 0;
-}
 
 
-int
-_luaseri_pack(lua_State *L) {
-    struct block temp;
-    temp.next = NULL;
-    struct write_block wb;
-    wb_init(&wb,&temp);
-    
-    pack_from(L, &wb, 0);
-    assert(wb.head == &temp);
-    seri(L, &temp, wb.len);
-    
-    wb_free(&wb);
-    
-    return 2;
-}
+
+
 //unpack
 int
 _luaseri_unpack(lua_State *L) {
@@ -635,6 +626,26 @@ _luaseri_unpack(lua_State *L) {
     /*need not free buffer*/
     return lua_gettop(L);
 }
+
+int
+_luaseri_pack(lua_State *L) {
+    struct block temp;
+    temp.next = NULL;
+    struct write_block wb;
+    wb_init(&wb,&temp);
+    
+    pack_from(L, &wb, 0);
+    assert(wb.head == &temp);
+    seri(L, &temp, wb.len);
+    
+    wb_free(&wb);
+    
+    return 2;
+}
+
+
+
+
 
 
 

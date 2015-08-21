@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include "mtask_atomic.h"
 
 #define KEY_TYPE_INTEGER    0
 #define KEY_TYPE_STRING     1
@@ -385,6 +386,7 @@ pconv(lua_State *L) {
 static void
 convert_stringmap(struct context *ctx, struct table *tbl) {
     lua_State *L = ctx->L;
+	lua_checkstack(L, ctx->string_index + LUA_MINSTACK);
     lua_settop(L, ctx->string_index + 1);
     lua_pushvalue(L, 1);
     struct state * s = lua_newuserdata(L, sizeof(*s));
@@ -671,7 +673,7 @@ releaseobj(lua_State *L) {
     struct ctrl *c = lua_touserdata(L, 1);
     struct table *tbl = c->root;
     struct state *s = lua_touserdata(tbl->L, 1);
-    __sync_fetch_and_sub(&s->ref, 1);
+    ATOM_DEC(&s->ref);
     c->root = NULL;
     c->update = NULL;
     
@@ -682,7 +684,7 @@ static int
 lboxconf(lua_State *L) {
     struct table * tbl = get_table(L,1);	
     struct state * s = lua_touserdata(tbl->L, 1);
-    __sync_fetch_and_add(&s->ref, 1);
+    ATOM_INC(&s->ref);
     
     struct ctrl * c = lua_newuserdata(L, sizeof(*c));
     c->root = tbl;
@@ -727,7 +729,7 @@ static int
 lincref(lua_State *L) {
     struct table *tbl = get_table(L,1);
     struct state * s = lua_touserdata(tbl->L, 1);
-    int ref = __sync_add_and_fetch(&s->ref, 1);
+    int ref = ATOM_INC(&s->ref);
     lua_pushinteger(L , ref);
     
     return 1;
@@ -737,7 +739,7 @@ static int
 ldecref(lua_State *L) {
     struct table *tbl = get_table(L,1);
     struct state * s = lua_touserdata(tbl->L, 1);
-    int ref = __sync_sub_and_fetch(&s->ref, 1);
+    int ref = ATOM_DEC(&s->ref);
     lua_pushinteger(L , ref);
     
     return 1;

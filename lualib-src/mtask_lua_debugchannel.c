@@ -11,14 +11,11 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include "mtask_spinlock.h"
 
 #define METANAME "debugchannel"
 
-#define LOCK(q) while (__sync_lock_test_and_set(&(q)->lock,1)) {}
-#define UNLOCK(q) __sync_lock_release(&(q)->lock);
 
-static const int HOOK_KEY =0;
 
 struct command {
     struct command *next;
@@ -26,15 +23,12 @@ struct command {
 };
 
 struct channel {
-    int lock;
+   	struct spinlock lock;
     int ref;
     struct command *head;
     struct command *tail;
 };
 
-struct channel_box {
-    struct channel *c;
-};
 
 
 
@@ -43,6 +37,7 @@ channel_new() {
     struct channel *c = malloc(sizeof(*c));
     memset(c, 0, sizeof(*c));
     c->ref = 1;
+    SPIN_INIT(c)
     
     return c;
 }
@@ -50,21 +45,21 @@ channel_new() {
 static struct channel *
 channel_connect(struct channel *c) {
     struct channel * ret = NULL;
-    LOCK(c)
+    SPIN_LOCK(c)
     if (c->ref == 1) {
         ++c->ref;
         ret = c;
     }
-    UNLOCK(c)
+    SPIN_UNLOCK(c)
     return ret;
 }
 
 static struct channel *
 channel_release(struct channel *c) {
-    LOCK(c)
+   SPIN_LOCK(c)
     --c->ref;
     if (c->ref >0) {
-        UNLOCK(c)
+        SPIN_UNLOCK(c)
         return c;
     }
     /*never unlock while reference is 0*/
@@ -76,6 +71,8 @@ channel_release(struct channel *c) {
         free(p);
         p=next;
     }
+	SPIN_UNLOCK(c)
+	SPIN_DESTROY(c)
     free(c);
     return NULL;
 }
@@ -83,9 +80,9 @@ channel_release(struct channel *c) {
 static struct command *
 channel_read(struct channel *c,double timeout) {
     struct command *ret = NULL;
-    LOCK(c)
+    SPIN_LOCK(c)
     if (c->head == NULL) {
-        UNLOCK(c)
+        SPIN_UNLOCK(c)
         int ti = (int)(timeout * 100000);
         usleep(ti);
         return NULL;
@@ -95,7 +92,7 @@ channel_read(struct channel *c,double timeout) {
     if (c->head ==NULL) {
         c->tail = NULL;
     }
-    UNLOCK(c)
+    SPIN_UNLOCK(c)
     return  ret;
 }
 
@@ -106,16 +103,19 @@ channel_write(struct channel *c,const char *s,size_t sz) {
     cmd->next = NULL;
     memcpy(cmd+1, s, sz);
     
-    LOCK(c)
+    SPIN_LOCK(c)
     if (c->tail==NULL) {
         c->head = c->tail = cmd;
     } else {
         c->tail->next = cmd;
         c->tail = cmd;
     }
-    UNLOCK(c)
+    SPIN_UNLOCK(c)
 }
 
+struct channel_box {
+	struct channel *c;
+};
 static int
 lread(lua_State *L) {
     struct channel_box *cb = luaL_checkudata(L, 1, METANAME);
@@ -196,6 +196,7 @@ lconnect(lua_State *L) {
     new_channel(L, c);
     return 1;
 }
+static const int HOOKKEY = 0;
 /*
  ** Auxiliary function used by several library functions: check for
  ** an optional thread as function's first argument and set 'arg' with
@@ -219,7 +220,7 @@ lua_State *getthread(lua_State *L,int *arg) {
 static void
 hookf(lua_State *L,lua_Debug *ar) {
     static const char * const hooknames[] = {"call","return","line","count","tail call"};
-    lua_rawgetp(L, LUA_REGISTRYINDEX, &HOOK_KEY);
+    lua_rawgetp(L, LUA_REGISTRYINDEX, &HOOKKEY);
     lua_pushthread(L);
     /* is there a hook function? */
     if (lua_rawget(L, -2) == LUA_TFUNCTION) {
@@ -262,11 +263,11 @@ db_sethook(lua_State *L) {
     int arg,mask,count;
     lua_Hook func;
     lua_State *L1 = getthread(L,&arg);
-    if (lua_isnoneornil(L, arg+1)) {
+    if (lua_isnoneornil(L, arg+1)) {  /* no hook? */
         lua_settop(L, arg+1);
         func = NULL;
         mask =0;
-        count=0;
+        count=0;   /* turn off hooks */
     } else {
         const char *smask = luaL_checkstring(L, arg+2);
         luaL_checktype(L, arg+1, LUA_TFUNCTION);
@@ -275,10 +276,10 @@ db_sethook(lua_State *L) {
         mask = makemask(smask,count);
     }
     
-    if (lua_rawgetp(L, LUA_REGISTRYINDEX, &HOOK_KEY) == LUA_TNIL) {
+    if (lua_rawgetp(L, LUA_REGISTRYINDEX, &HOOKKEY) == LUA_TNIL) {
         lua_createtable(L, 0, 2);/* create a hook table */
         lua_pushvalue(L, -1);
-        lua_rawsetp(L, LUA_REGISTRYINDEX, &HOOK_KEY);/* set it in position */
+        lua_rawsetp(L, LUA_REGISTRYINDEX, &HOOKKEY);/* set it in position */
         lua_pushstring(L, "k");
         lua_setfield(L, -2, "__mode");  /** hooktable.__mode = "k" */
         lua_pushvalue(L, -1);

@@ -21,6 +21,13 @@
 static double
 get_time() {
 #if !defined(__APPLE__)
+	 	struct timespec ti;
+	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ti);
+
+	int sec = ti.tv_sec & 0xffff;
+	int nsec = ti.tv_nsec;
+
+	return (double)sec + (double)nsec / NANOSEC;
     
     
 #else

@@ -242,6 +242,7 @@ mtask_lalloc(void *ud, void *ptr, size_t osize, size_t nsize) {
         return mtask_realloc(ptr, nsize);
     }
 }
+
 int
 dump_mem_lua(lua_State *L) {
 	int i;

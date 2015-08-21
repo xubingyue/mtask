@@ -12,7 +12,7 @@
 #include <string.h>
 
 #include "mtask.h"
-
+#include "mtask_atomic.h"
 
 struct mc_package {
     int reference;
@@ -22,7 +22,7 @@ struct mc_package {
 
 static int
 pack(lua_State *L,void *data,size_t size) {
-    struct mc_package *pack = mtask_malloc(sizeof(*pack));
+    struct mc_package *pack = mtask_malloc(sizeof(struct mc_package));
     pack->reference = 0;
     pack->size = (uint32_t)size;
     pack->data = data;
@@ -34,16 +34,61 @@ pack(lua_State *L,void *data,size_t size) {
     return 2;
 }
 
+/*
+	lightuserdata
+	integer size
+
+	return lightuserdata, sizeof(struct mc_package *)
+ */
 static int
 mc_packlocal(lua_State *L) {
     void *data = lua_touserdata(L, 1);
-    size_t size = luaL_checkinteger(L, 2);
+    size_t size = (size_t)luaL_checkinteger(L, 2);
     if (size != (uint32_t)size) {
         return luaL_error(L, "Size should be 32bit integer");
     }
     return pack(L, data, size);
 }
 
+
+
+/*
+	lightuserdata
+	integer size
+
+	return lightuserdata, sizeof(struct mc_package *)
+ */
+static int
+mc_packremote(lua_State *L) {
+    void *data = lua_touserdata(L, 1);
+    size_t size = (size_t)luaL_checkinteger(L, 2);
+    if (size != (uint32_t)size) {
+        return luaL_error(L, "Size should be 32bit integer");
+    }
+    void *msg = mtask_malloc(size);
+    memcpy(msg, data, size);
+    return pack(L, msg, size);
+}
+static int
+mc_packstring(lua_State *L) {
+    size_t size;
+    const char *msg = luaL_checklstring(L, 1, &size);
+    if (size !=(uint32_t)size) {
+        return luaL_error(L, "string is too long");
+    }
+    void *data  = mtask_malloc(size);
+    memcpy(data, msg, size);
+    return pack(L, data, size);
+}
+
+
+
+/*
+	lightuserdata struct mc_package **
+	integer size (must be sizeof(struct mc_package *)
+
+	return package, lightuserdata, size
+ */
 static int
 mc_unpacklocal(lua_State *L) {
     struct mc_package **pack = lua_touserdata(L, 1);
@@ -57,6 +102,12 @@ mc_unpacklocal(lua_State *L) {
     return 3;
 }
 
+/*
+	lightuserdata struct mc_package **
+	integer reference
+
+	return mc_package *
+ */
 static int
 mc_bindrefer(lua_State *L) {
     struct mc_package ** pack = lua_touserdata(L, 1);
@@ -71,11 +122,14 @@ mc_bindrefer(lua_State *L) {
     return 1;
 }
 
+/*
+	lightuserdata struct mc_package *
+ */
 static int
 mc_closelocal(lua_State *L) {
     struct mc_package *pack = lua_touserdata(L, 1);
     
-    int ref = __sync_sub_and_fetch(&pack->reference ,1);
+    int ref = ATOM_DEC(&pack->reference);
     if (ref <=0) {
         mtask_free(pack->data);
         mtask_free(pack);
@@ -87,6 +141,10 @@ mc_closelocal(lua_State *L) {
     return 0;
 }
 
+/*
+	lightuserdata struct mc_package **
+	return lightuserdata/size
+ */
 static int
 mc_remote(lua_State *L) {
     struct mc_package **ptr = lua_touserdata(L, 1);
@@ -100,35 +158,12 @@ mc_remote(lua_State *L) {
     return 2;
 }
 
-static int
-mc_packstring(lua_State *L) {
-    size_t size;
-    const char *msg = luaL_checklstring(L, 1, &size);
-    if (size !=(uint32_t)size) {
-        return luaL_error(L, "string is too long");
-    }
-    void *data  = mtask_malloc(size);
-    memcpy(data, msg, size);
-    return pack(L, data, size);
-}
-
-static int
-mc_packremote(lua_State *L) {
-    void *data = lua_touserdata(L, 1);
-    size_t size = luaL_checkinteger(L, 2);
-    if (size != (uint32_t)size) {
-        return luaL_error(L, "Size should be 32bit integer");
-    }
-    void *msg = mtask_malloc(size);
-    memcpy(msg, data, size);
-    return pack(L, msg, size);
-}
 
 static int
 mc_nextid(lua_State *L) {
-    uint32_t id = luaL_checkinteger(L, 1);
+    uint32_t id = (uint32_t)luaL_checkinteger(L, 1);
     id += 256;
-    lua_pushinteger(L, id);
+    lua_pushinteger(L, (uint32_t)id);
     
     return 1;
 }

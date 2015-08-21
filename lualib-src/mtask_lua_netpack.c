@@ -28,7 +28,7 @@
 #define TYPE_ERROR 3
 #define TYPE_OPEN  4
 #define TYPE_CLOSE 5
-
+#define TYPE_WARNING 6
 
 /*each  package is uint16 + data,uint16(serialized in big-endian)is the number of bytes comprising the data .*/
 
@@ -63,21 +63,30 @@ clear_list(struct uncomplete *uc) {
 }
 
 static int
-lpop(lua_State *L) {
-    struct queue *q = lua_touserdata(L, 1);
-    if (q==NULL || q->head == q->tail) {
+lclear(lua_State *L) {
+    struct queue * q = lua_touserdata(L, 1);
+    if (q == NULL) {
         return 0;
     }
-    struct netpack *np =&q->queue[q->head];
-    if (++q->head >= q->cap) {
-        q->head = 0;
+    int i;
+    for (i=0;i<HASHSIZE;i++) {
+        clear_list(q->hash[i]);
+        q->hash[i] = NULL;
     }
-    lua_pushinteger(L, np->id);
-    lua_pushlightuserdata(L, np->buffer);
-    lua_pushinteger(L, np->size);
+    if (q->head > q->tail) {
+        q->tail += q->cap;
+    }
+    for (i=q->head;i<q->tail;i++) {
+        struct netpack *np = &q->queue[i % q->cap];
+        mtask_free(np->buffer);
+    }
+    q->head = q->tail = 0;
     
-    return 3;
+    return 0;
 }
+
+
+
 
 static inline int
 hash_fd(int fd) {
@@ -132,7 +141,7 @@ get_queue(lua_State *L) {
 
 static void
 expand_queue(lua_State *L,struct queue*q) {
-    struct queue *nq = lua_newuserdata(L, sizeof(struct queue));
+    struct queue *nq = lua_newuserdata(L, sizeof(struct queue)+q->cap *sizeof(struct netpack));
     nq->cap = q->cap + QUEUESIZE;
     nq->head = 0;
     nq->tail = q->cap;
@@ -217,6 +226,15 @@ push_more(lua_State *L ,int fd,uint8_t *buffer,int size) {
     }
 }
 
+static void
+close_uncomplete(lua_State *L, int fd) {
+	struct queue *q = lua_touserdata(L,1);
+	struct uncomplete * uc = find_uncomplete(q, fd);
+	if (uc) {
+		mtask_free(uc->pack.buffer);
+		mtask_free(uc);
+	}
+}
 static int
 filter_data_(lua_State *L,int fd,uint8_t *buffer,int size) {
     struct queue *q = lua_touserdata(L, 1);
@@ -313,15 +331,6 @@ filter_data(lua_State *L,int fd,uint8_t *buffer,int size) {
     return ret;
 }
 
-static void
-close_uncomplete(lua_State *L,int fd) {
-    struct queue *q = lua_touserdata(L, 1);
-    struct uncomplete *uc = find_uncomplete(q, fd);
-    if (uc) {
-        mtask_free(uc->pack.buffer);
-        mtask_free(uc);
-    }
-}
 
 static void
 pushstring(lua_State *L,const char *msg,int size) {
@@ -368,15 +377,52 @@ lfilter(lua_State *L) {
             return 4;
             
         case  MTASK_SOCKET_TYPE_ERROR:
+				// no more data in fd (message->id)
             close_uncomplete(L, message->id);
             lua_pushvalue(L, lua_upvalueindex(TYPE_ERROR));
             lua_pushinteger(L, message->id);
-            return 4;
+			pushstring(L, buffer, size);
+			return 4;
+		case MTASK_SOCKET_TYPE_WARNING:
+			lua_pushvalue(L, lua_upvalueindex(TYPE_WARNING));
+			lua_pushinteger(L, message->id);
+			lua_pushinteger(L, message->ud);
+			return 4;
+
         default:
             /*never get here*/
             return 1;
     }
 }
+/*
+	userdata queue
+	return
+		integer fd
+		lightuserdata msg
+		integer size
+ */
+static int
+lpop(lua_State *L) {
+    struct queue *q = lua_touserdata(L, 1);
+    if (q==NULL || q->head == q->tail) {
+        return 0;
+    }
+    struct netpack *np =&q->queue[q->head];
+    if (++q->head >= q->cap) {
+        q->head = 0;
+    }
+    lua_pushinteger(L, np->id);
+    lua_pushlightuserdata(L, np->buffer);
+    lua_pushinteger(L, np->size);
+    
+    return 3;
+}
+
+/*
+	string msg | lightuserdata/integer
+
+	lightuserdata/integer
+ */
 
 static const char *
 tolstring(lua_State *L,size_t *sz,int index) {
@@ -414,79 +460,8 @@ lpack(lua_State *L) {
     return 2;
 }
 
-static int
-lpack_string(lua_State *L) {
-    uint8_t tmp[SMALLSTRING+2];
-    size_t len;
-    uint8_t *buffer;
-    const char *ptr = tolstring(L, &len, 1);
-    if (len > 0x10000) {
-        return luaL_error(L, "Invalid size (too long) of data : %d", (int)len);
-    }
-    
-    if (len <= SMALLSTRING) {
-        buffer = tmp;
-    } else {
-        buffer = lua_newuserdata(L, len + 2);
-    }
-    
-    write_size(buffer, len);
-    memcpy(buffer+2, ptr, len);
-    lua_pushlstring(L, (const char *)buffer, len+2);
-    
-    return 1;
-}
 
-static int
-lpack_padding(lua_State *L) {
-    uint8_t tmp[SMALLSTRING+2];
-    size_t content_sz;
-    uint8_t *buffer;
-    const char * ptr = tolstring(L, &content_sz, 2);
-    size_t cookie_sz = 0;
-    const char * cookie = luaL_checklstring(L,1,&cookie_sz);
-    size_t len = cookie_sz + content_sz;
-    
-    if (len > 0x10000) {
-        return luaL_error(L, "Invalid size (too long) of data : %d", (int)len);
-    }
-    
-    if (len <= SMALLSTRING) {
-        buffer = tmp;
-    } else {
-        buffer = lua_newuserdata(L, len + 2);
-    }
-    
-    write_size(buffer, len);
-    memcpy(buffer+2, ptr, content_sz);
-    memcpy(buffer+2+content_sz, cookie, cookie_sz);
-    lua_pushlstring(L, (const char *)buffer, len+2);
-    
-    return 1;
-}
 
-static int
-lclear(lua_State *L) {
-    struct queue * q = lua_touserdata(L, 1);
-    if (q == NULL) {
-        return 0;
-    }
-    int i;
-    for (i=0;i<HASHSIZE;i++) {
-        clear_list(q->hash[i]);
-        q->hash[i] = NULL;
-    }
-    if (q->head > q->tail) {
-        q->tail += q->cap;
-    }
-    for (i=q->head;i<q->tail;i++) {
-        struct netpack *np = &q->queue[i % q->cap];
-        mtask_free(np->buffer);
-    }
-    q->head = q->tail = 0;
-    
-    return 0;
-}
 
 static int
 ltostring(lua_State *L) {
@@ -494,20 +469,9 @@ ltostring(lua_State *L) {
     int size = luaL_checkinteger(L, 2);
     if (ptr == NULL) {
         lua_pushliteral(L, "");
-    } else {
-        if (lua_isnumber(L, 3)) {
-            int offset = lua_tointeger(L, 3);
-            if (offset < 0) {
-                return luaL_error(L, "Invalid offset %d", offset);
-            }
-            if (offset > size) {
-                offset = size;
-            }
-            lua_pushlstring(L, (const char *)ptr + offset, size-offset);
-        } else {
-            lua_pushlstring(L, (const char *)ptr, size);
-            mtask_free(ptr);
-        }
+    } else { 
+		lua_pushlstring(L, (const char *)ptr, size);
+        mtask_free(ptr);
     }
     return 1;
 }
@@ -518,8 +482,6 @@ luaopen_netpack(lua_State *L) {
     luaL_Reg l[] = {
         {"pop",lpop},
         {"pack", lpack },
-        {"pack_string", lpack_string },
-        {"pack_padding", lpack_padding },
         {"clear", lclear },
         {"tostring", ltostring },
 
@@ -533,8 +495,9 @@ luaopen_netpack(lua_State *L) {
     lua_pushliteral(L, "error");
     lua_pushliteral(L, "open");
     lua_pushliteral(L, "close");
+	lua_pushliteral(L, "warning");
     
-    lua_pushcclosure(L, lfilter, 5);
+    lua_pushcclosure(L, lfilter, 6);
     lua_setfield(L, -2, "filter");
     
     return 1;
