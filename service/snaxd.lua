@@ -37,7 +37,7 @@ end
 local function return_f(f, ...)
 	return mtask.ret(mtask.pack(f(...)))
 end
---这段代码中，使用 profile.start() 和 profile.stop() 统计出其间的时间开销（返回单位是秒）。然后按消息类型分别记录在一张表 ti 中。
+
 local function timing( method, ... )
 	local err, msg
 	profile.start()
@@ -52,11 +52,9 @@ local function timing( method, ... )
 	assert(err,msg)
 end
 
---使用 mtask.info_func() 可以注册一个函数给 debug 消息处理。向这个服务发送 debug 消息 INFO 就会调用这个函数取得返回值。
---ps. 使用 debug console 可以主动向服务发送 debug 消息。
 mtask.start(function()
 	local init = false
-	mtask.dispatch("snax", function ( session , source , id, ...)
+	local function dispatcher( session , source , id, ...)
 		local method = func[id]
 
 		if method[2] == "system" then
@@ -69,7 +67,7 @@ mtask.start(function()
 				local initfunc = method[4] or function() end
 				initfunc(...)
 				mtask.ret()
-				mtask.info_func(function() --注册info函数,便于debug指令INFO查询
+				mtask.info_func(function()
 					return profile_table
 				end)
 				init = true
@@ -86,5 +84,11 @@ mtask.start(function()
 			assert(init, "Init first")
 			timing(method, ...)
 		end
-	end)
+	end
+	mtask.dispatch("snax", dispatcher)
+
+	-- set lua dispatcher
+	function snax.enablecluster()
+		mtask.dispatch("lua", dispatcher)
+	end
 end)

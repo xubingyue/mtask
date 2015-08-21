@@ -1,9 +1,7 @@
---演示如何使用登陆服
 local login = require "snax.loginserver"
 local crypt = require "crypt"
 local mtask = require "mtask"
 
---构造配置表
 local server = {
 	host = "127.0.0.1",
 	port = 8001,
@@ -15,7 +13,6 @@ local server_list = {}
 local user_online = {}
 local user_login = {}
 
---验证token
 function server.auth_handler(token)
 	-- the token is base64(user)@base64(server):base64(password)
 	local user, server, password = token:match("([^@]+)@([^:]+):(.+)")
@@ -26,7 +23,6 @@ function server.auth_handler(token)
 	return server, user
 end
 
---处理登陆
 function server.login_handler(server, uid, secret)
 	print(string.format("%s@%s is login, secret is %s", uid, server, crypt.hexencode(secret)))
 	local gameserver = assert(server_list[server], "Unknown server")
@@ -45,11 +41,11 @@ function server.login_handler(server, uid, secret)
 end
 
 local CMD = {}
---注册新的登陆点
+
 function CMD.register_gate(server, address)
 	server_list[server] = address
 end
---登陆点通知玩家下线了
+
 function CMD.logout(uid, subid)
 	local u = user_online[uid]
 	if u then
@@ -58,9 +54,9 @@ function CMD.logout(uid, subid)
 	end
 end
 
-function server.command_handler(command, source, ...)
+function server.command_handler(command, ...)
 	local f = assert(CMD[command])
-	return f(source, ...)
+	return f(...)
 end
 
-login(server)	--启动登陆服务器
+login(server)

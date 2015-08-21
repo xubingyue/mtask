@@ -35,7 +35,7 @@ local function dump_list(list)
 end
 
 mtask.start(function()
-	local list = mtask.call(".launcher","lua", unpack(cmd))
+	local list = mtask.call(".launcher","lua", table.unpack(cmd))
 	if list then
 		dump_list(list)
 	end

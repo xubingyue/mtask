@@ -2,8 +2,9 @@ local mtask = require "mtask"
 local netpack = require "netpack"
 local socket = require "socket"
 local sproto = require "sproto"
-local bit32 = require "bit32"
+local sprotoloader = require "sprotoloader"
 
+local WATCHDOG
 local host
 local send_request
 
@@ -26,6 +27,10 @@ function REQUEST:handshake()
 	return { msg = "Welcome to mtask, I will send heartbeat every 5 sec." }
 end
 
+function REQUEST:quit()
+	mtask.call(WATCHDOG, "lua", "close", client_fd)
+end
+
 local function request(name, args, response)
 	local f = assert(REQUEST[name])
 	local r = f(args)
@@ -35,11 +40,7 @@ local function request(name, args, response)
 end
 
 local function send_package(pack)
-	local size = #pack
-	local package = string.char(bit32.extract(size,8,8)) ..
-		string.char(bit32.extract(size,0,8))..
-		pack
-
+	local package = string.pack(">s2", pack)
 	socket.write(client_fd, package)
 end
 
@@ -66,9 +67,13 @@ mtask.register_protocol {
 	end
 }
 
-function CMD.start(gate, fd, proto)
-	host = sproto.new(proto.c2s):host "package"
-	send_request = host:attach(sproto.new(proto.s2c))
+function CMD.start(conf)
+	local fd = conf.client
+	local gate = conf.gate
+	WATCHDOG = conf.watchdog
+	-- slot 1,2 set at main.lua
+	host = sprotoloader.load(1):host "package"
+	send_request = host:attach(sprotoloader.load(2))
 	mtask.fork(function()
 		while true do
 			send_package(send_request "heartbeat")
@@ -78,6 +83,11 @@ function CMD.start(gate, fd, proto)
 
 	client_fd = fd
 	mtask.call(gate, "lua", "forward", fd)
+end
+
+function CMD.disconnect()
+	-- todo: do something before exit
+	mtask.exit()
 end
 
 mtask.start(function()

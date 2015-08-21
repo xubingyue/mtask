@@ -1,8 +1,3 @@
---snax 是支持热更新的（只能热更新 snax 框架编写的 lua 服务）。但热更新更多的用途是做不停机的 bug 修复，不应用于常规的版本更新。所以，热更新的 api 被设计成下面这个样子。更适合打补丁。
-
---你可以通过 snax.hotfix(obj, patchcode) 来向 obj 提交一个 patch 。
-
-
 local si = require "snax.interface"
 local io = io
 
@@ -54,7 +49,9 @@ local function collect_all_uv(funcs)
 			collect_uv(v[4], global, envid(v[4]))
 		end
 	end
-
+	if not global["_ENV"] then
+		global["_ENV"] = {func = collect_uv, index = 1}
+	end
 	return global
 end
 

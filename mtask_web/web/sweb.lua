@@ -1,4 +1,4 @@
-local skynet = require "skynet"
+local mtask = require "mtask"
 local web_interface = require "web.web_interface"
 local urllib = require "http.url"
 local sweb = {}

@@ -1,11 +1,11 @@
 local mtask = require "mtask"
 local core = require "mtask.core"
+require "mtask.manager"	-- import manager apis
 local string = string
 
-local services = {} --句柄->服务名+参数
-local command = {}  --
+local services = {}
+local command = {}
 local instance = {} -- for confirm (function command.LAUNCH / command.ERROR / command.LAUNCHOK)
---句柄->响应闭包
 
 local function handle_to_address(handle)
 	return tonumber("0x" .. string.sub(handle , 2))
@@ -42,7 +42,7 @@ function command.MEM()
 	local list = {}
 	for k,v in pairs(services) do
 		local kb, bytes = mtask.call(k,"debug","MEM")
-		list[mtask.address(k)] = string.format("%d Kb (%s)",kb,v)
+		list[mtask.address(k)] = string.format("%.2f Kb (%s)",kb,v)
 	end
 	return list
 end
@@ -54,12 +54,12 @@ function command.GC()
 	return command.MEM()
 end
 
-function command.REMOVE(_, handle)
+function command.REMOVE(_, handle, kill)
 	services[handle] = nil
 	local response = instance[handle]
 	if response then
 		-- instance is dead
-		response(false)
+		response(not kill)	-- return nil to caller of newservice, when kill == false
 		instance[handle] = nil
 	end
 
@@ -69,19 +69,19 @@ end
 
 local function launch_service(service, ...)
 	local param = table.concat({...}, " ")
-	local inst = mtask.launch(service, param) --启动服务
-	local response = mtask.response()        --这里为什么创建一个闭包呢？
-	if inst then --启动成功
-		services[inst] = service .. " " .. param --保存服务名 参数
-		instance[inst] = response --保存闭包
+	local inst = mtask.launch(service, param)
+	local response = mtask.response()
+	if inst then
+		services[inst] = service .. " " .. param
+		instance[inst] = response
 	else
-		response(false) --启动失败 抛出异常
+		response(false)
 		return
 	end
-	return inst --返回句柄
+	return inst
 end
 
-function command.LAUNCH(_, service, ...) --接收到启动消息
+function command.LAUNCH(_, service, ...)
 	launch_service(service, ...)
 	return NORET
 end
@@ -118,7 +118,7 @@ function command.LAUNCHOK(address)
 end
 
 -- for historical reasons, launcher support text command (for C service)
--- 出于历史原因，launcher支持文本命令(用于C服务)
+
 mtask.register_protocol {
 	name = "text",
 	id = mtask.PTYPE_TEXT,
@@ -139,7 +139,7 @@ mtask.dispatch("lua", function(session, address, cmd , ...)
 	local f = command[cmd]
 	if f then
 		local ret = f(address, ...)
-		if ret ~= NORET then 
+		if ret ~= NORET then
 			mtask.ret(mtask.pack(ret))
 		end
 	else

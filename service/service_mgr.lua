@@ -1,5 +1,5 @@
---管理UniqueService
 local mtask = require "mtask"
+require "mtask.manager"	-- import mtask.register
 local snax = require "snax"
 
 local cmd = {}

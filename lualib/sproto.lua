@@ -1,25 +1,35 @@
 local core = require "sproto.core"
-local assert =assert
+local assert = assert
 
 local sproto = {}
-local host= {}
+local host = {}
 
-local weak_mt ={__mode="kv"}
-local sproto_mt = {__index=sproto}
-local host_mt ={__index=host}
+local weak_mt = { __mode = "kv" }
+local sproto_mt = { __index = sproto }
+local sproto_nogc = { __index = sproto }
+local host_mt = { __index = host }
 
-function sproto_mt:gc()
+function sproto_mt:__gc()
 	core.deleteproto(self.__cobj)
 end
 
-function sproto.new(pbin)
-	local cobj = assert(core.newproto(pbin))
-	local self ={
-	     __cobj = cobj,
-	     __tcache = setmetatable({},weak_mt),
-	     __pcache = setmetatable({},weak_mt),
+function sproto.new(bin)
+	local cobj = assert(core.newproto(bin))
+	local self = {
+		__cobj = cobj,
+		__tcache = setmetatable( {} , weak_mt ),
+		__pcache = setmetatable( {} , weak_mt ),
 	}
-	return setmetatable(self,sproto_mt)
+	return setmetatable(self, sproto_mt)
+end
+
+function sproto.sharenew(cobj)
+	local self = {
+		__cobj = cobj,
+		__tcache = setmetatable( {} , weak_mt ),
+		__pcache = setmetatable( {} , weak_mt ),
+	}
+	return setmetatable(self, sproto_nogc)
 end
 
 function sproto.parse(ptext)
@@ -28,15 +38,14 @@ function sproto.parse(ptext)
 	return sproto.new(pbin)
 end
 
---这条调用会返回一个 host 对象，用于处理接收的消息。
-function sproto:host(packagename)
-	packagename = packagename or "package"
+function sproto:host( packagename )
+	packagename = packagename or  "package"
 	local obj = {
 		__proto = self,
-		__package = core.querytype(self.__cobj,packagename),
+		__package = core.querytype(self.__cobj, packagename),
 		__session = {},
 	}
-	return setmetatable(obj,host_mt)
+	return setmetatable(obj, host_mt)
 end
 
 local function querytype(self, typename)
@@ -54,9 +63,9 @@ function sproto:encode(typename, tbl)
 	return core.encode(st, tbl)
 end
 
-function sproto:decode(typename, bin)
+function sproto:decode(typename, ...)
 	local st = querytype(self, typename)
-	return core.decode(st, bin)
+	return core.decode(st, ...)
 end
 
 function sproto:pencode(typename, tbl)
@@ -64,9 +73,9 @@ function sproto:pencode(typename, tbl)
 	return core.pack(core.encode(st, tbl))
 end
 
-function sproto:pdecode(typename, bin)
+function sproto:pdecode(typename, ...)
 	local st = querytype(self, typename)
-	return core.decode(st, core.unpack(bin))
+	return core.decode(st, core.unpack(...))
 end
 
 local function queryproto(self, pname)
@@ -90,6 +99,66 @@ local function queryproto(self, pname)
 	return v
 end
 
+function sproto:request_encode(protoname, tbl)
+	local p = queryproto(self, protoname)
+	local request = p.request
+	if request then
+		return core.encode(request,tbl) , p.tag
+	else
+		return "" , p.tag
+	end
+end
+
+function sproto:response_encode(protoname, tbl)
+	local p = queryproto(self, protoname)
+	local response = p.response
+	if response then
+		return core.encode(response,tbl)
+	else
+		return ""
+	end
+end
+
+function sproto:request_decode(protoname, ...)
+	local p = queryproto(self, protoname)
+	local request = p.request
+	if request then
+		return core.decode(request,...) , p.name
+	else
+		return nil, p.name
+	end
+end
+
+function sproto:response_decode(protoname, ...)
+	local p = queryproto(self, protoname)
+	local response = p.response
+	if response then
+		return core.decode(response,...)
+	end
+end
+
+sproto.pack = core.pack
+sproto.unpack = core.unpack
+
+function sproto:default(typename, type)
+	if type == nil then
+		return core.default(querytype(self, typename))
+	else
+		local p = queryproto(self, typename)
+		if type == "REQUEST" then
+			if p.request then
+				return core.default(p.request)
+			end
+		elseif type == "RESPONSE" then
+			if p.response then
+				return core.default(p.response)
+			end
+		else
+			error "Invalid type"
+		end
+	end
+end
+
 local header_tmp = {}
 
 local function gen_response(self, response, session)
@@ -105,20 +174,6 @@ local function gen_response(self, response, session)
 		end
 	end
 end
-
---host:dispatch(msgcontent)
---用于处理一条消息.这里的msgcontent也是一个字符串,或是一个userdata(指针)加一个长度。
---它应符合上述的以 sproto 的 0-pack 方式打包的包格式。
-
--- dispatch 调用有两种可能的返回类别，由第一个返回值决定：
--- REQUEST:第一个返回值为 "REQUEST" 时，表示这是一个远程请求。
--- 			如果请求包中没有 session 字段，表示该请求不需要回应。
--- 			这时，第 2 和第 3 个返回值分别为消息类型名（即在sproto定义中提到的某个以 .
--- 		    开头的类型名），以及消息内容（通常是一个 table);
--- 		    如果请求包中有session 字段,那么还会有第 4 个返回值：一个用于生成回应包的函数。
-
--- RESPONSE:第一个返回值为"RESPONSE"时,第2和第3个返回值分别为session
--- 和消息内容.消息内容通常是一个table,但也可能不存在内容（仅仅是一个回应确认)。
 
 function host:dispatch(...)
 	local bin = core.unpack(...)
@@ -151,10 +206,8 @@ function host:dispatch(...)
 		end
 	end
 end
---attach可以构造一个发送函数,用来将对外请求打包编码成可以被dispatch正确解码的数据包。
---这个sender函数接受三个参数(name,args,session)name 是消息的字符串名、args 是一张保存用消息内容的 table ，而 session 是你提供的唯一识别号，用于让对方正确的回应。
---当你的协议不规定不需要回应时，session 可以不给出。同样，args 也可以为空。
-function host:attach(sp)-- 这里的 sp 指向外发出的消息协议定义
+
+function host:attach(sp)
 	return function(name, args, session)
 		local proto = queryproto(sp, name)
 		header_tmp.type = proto.tag
@@ -175,7 +228,3 @@ function host:attach(sp)-- 这里的 sp 指向外发出的消息协议定义
 end
 
 return sproto
-
-
-
-

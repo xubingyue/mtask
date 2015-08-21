@@ -1,6 +1,6 @@
---组网;负责同步 mtask 网络中的全局可见的服务名字
 local mtask = require "mtask"
 local socket = require "socket"
+require "mtask.manager"	-- import mtask.launch, ...
 local table = table
 
 local slaves = {}

@@ -8,7 +8,6 @@ local function echo(id)
 
 	while true do
 		local str = socket.read(id)
-		--print("str==>",str)
 		if str then
 			socket.write(id, str)
 		else
@@ -30,7 +29,6 @@ if mode == "agent" then
 else
 	local function accept(id)
 		socket.start(id)
-		print("ttc client")
 		socket.write(id, "Hello mtask\n")
 		mtask.newservice(SERVICE_NAME, "agent", id)
 		-- notice: Some data on this connection(id) may lost before new service start.

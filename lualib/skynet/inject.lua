@@ -1,5 +1,5 @@
 local function getupvaluetable(u, func, unique)
-	i = 1
+	local i = 1
 	while true do
 		local name, value = debug.getupvalue(func, i)
 		if name == nil then
@@ -18,7 +18,7 @@ local function getupvaluetable(u, func, unique)
 	end
 end
 
-return function(source, filename , ...)
+return function(mtask, source, filename , ...)
 	if filename then
 		filename = "@" .. filename
 	else
@@ -44,7 +44,7 @@ return function(source, filename , ...)
 	if proto then
 		for k,v in pairs(proto) do
 			local name, dispatch = v.name, v.dispatch
-			if name and dispatch then
+			if name and dispatch and not p[name] then
 				local pp = {}
 				p[name] = pp
 				getupvaluetable(pp, dispatch, unique)
@@ -56,7 +56,7 @@ return function(source, filename , ...)
 	if not func then
 		return { err }
 	end
-	local ok, err = xpcall(func, debug.traceback)
+	local ok, err = mtask.pcall(func)
 	if not ok then
 		table.insert(output, err)
 	end

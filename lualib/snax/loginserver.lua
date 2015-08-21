@@ -1,5 +1,5 @@
---一个通用的登陆服务器模版 
 local mtask = require "mtask"
+require "mtask.manager"
 local socket = require "socket"
 local crypt = require "crypt"
 local table = table
@@ -34,17 +34,17 @@ Success:
 ]]
 
 local socket_error = {}
-local function assert_socket(v, fd)
+local function assert_socket(service, v, fd)
 	if v then
 		return v
 	else
-		mtask.error(string.format("auth failed: socket (fd = %d) closed", fd))
+		mtask.error(string.format("%s failed: socket (fd = %d) closed", service, fd))
 		error(socket_error)
 	end
 end
 
-local function write(fd, text)
-	assert_socket(socket.write(fd, text), fd)
+local function write(service, fd, text)
+	assert_socket(service, socket.write(fd, text), fd)
 end
 
 local function launch_slave(auth_handler)
@@ -58,27 +58,27 @@ local function launch_slave(auth_handler)
 		socket.limit(fd, 8192)
 
 		local challenge = crypt.randomkey()
-		write(fd, crypt.base64encode(challenge).."\n")
+		write("auth", fd, crypt.base64encode(challenge).."\n")
 
-		local handshake = assert_socket(socket.readline(fd), fd)
+		local handshake = assert_socket("auth", socket.readline(fd), fd)
 		local clientkey = crypt.base64decode(handshake)
 		if #clientkey ~= 8 then
 			error "Invalid client key"
 		end
 		local serverkey = crypt.randomkey()
-		write(fd, crypt.base64encode(crypt.dhexchange(serverkey)).."\n")
+		write("auth", fd, crypt.base64encode(crypt.dhexchange(serverkey)).."\n")
 
 		local secret = crypt.dhsecret(clientkey, serverkey)
 
-		local response = assert_socket(socket.readline(fd), fd)
+		local response = assert_socket("auth", socket.readline(fd), fd)
 		local hmac = crypt.hmac64(challenge, secret)
 
 		if hmac ~= crypt.base64decode(response) then
-			write(fd, "400 Bad Request\n")
+			write("auth", fd, "400 Bad Request\n")
 			error "challenge failed"
 		end
 
-		local etoken = assert_socket(socket.readline(fd),fd)
+		local etoken = assert_socket("auth", socket.readline(fd),fd)
 
 		local token = crypt.desdecode(secret, crypt.base64decode(etoken))
 
@@ -92,7 +92,11 @@ local function launch_slave(auth_handler)
 		if ok then
 			mtask.ret(mtask.pack(err, ...))
 		else
-			error(err)
+			if err == socket_error then
+				mtask.ret(mtask.pack(nil, "socket error"))
+			else
+				mtask.ret(mtask.pack(false, err))
+			end
 		end
 	end
 
@@ -109,13 +113,15 @@ local function accept(conf, s, fd, addr)
 	socket.start(fd)
 
 	if not ok then
-		write(fd, "401 Unauthorized\n")
+		if ok ~= nil then
+			write("response 401", fd, "401 Unauthorized\n")
+		end
 		error(server)
 	end
 
 	if not conf.multilogin then
 		if user_login[uid] then
-			write(fd, "406 Not Acceptable\n")
+			write("response 406", fd, "406 Not Acceptable\n")
 			error(string.format("User %s is already login", uid))
 		end
 
@@ -128,9 +134,9 @@ local function accept(conf, s, fd, addr)
 
 	if ok then
 		err = err or ""
-		write(fd,  "200 "..crypt.base64encode(err).."\n")
+		write("response 200",fd,  "200 "..crypt.base64encode(err).."\n")
 	else
-		write(fd,  "403 Forbidden\n")
+		write("response 403",fd,  "403 Forbidden\n")
 		error(err)
 	end
 end
@@ -169,21 +175,6 @@ local function launch_master(conf)
 		socket.close(fd)
 	end)
 end
---构造配置表，然后调用它就可以启动一个登陆服务器。
--- local server = {
---     host = "127.0.0.1",
---     port = 8001,
---     multilogin = false, -- disallow multilogin
---     name = "login_master",
---      -- config, etc
--- }
--- login(server)
-
--- host 是监听地址，通常是 "0.0.0.0" 。
--- port 是监听端口。
--- name 是一个内部使用的名字，不要和 mtask 其它服务重名。在上面的例子，登陆服务器会注册为 .login_master 这个名字。
--- multilogin 是一个 boolean ，默认是 false 。关闭后，当一个用户正在走登陆流程时，禁止同一用户名进行登陆。如果你希望用户可以同时登陆，可以打开这个开关，但需要自己处理好潜在的并行的状态管理问题。
--- 同时，你还需要注册一系列业务相关的方法。
 
 local function login(conf)
 	local name = "." .. (conf.name or "login")

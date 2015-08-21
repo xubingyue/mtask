@@ -1,4 +1,4 @@
-local skynet = require "skynet"
+local mtask = require "mtask"
 
 return function (name , G, loader,web_root)
    loader = loader or loadfile
@@ -66,7 +66,7 @@ return function (name , G, loader,web_root)
    local pattern
 
    do
-      local root = web_root --skynet.getenv "web_root"      
+      local root = web_root --mtask.getenv "web_root"      
       local errlist = {}
       
       --local filename = string.gsub(pat, "?", name)

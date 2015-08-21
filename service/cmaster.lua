@@ -1,4 +1,3 @@
---组网;责同步 mtask 网络中的全局可见的服务名字
 local mtask = require "mtask"
 local socket = require "socket"
 
@@ -26,77 +25,76 @@ local socket = require "socket"
 			'D' : DISCONNECT slave_id
 ]]
 
-local slave_node ={}
-local global_name={}
+local slave_node = {}
+local global_name = {}
 
 local function read_package(fd)
-	local sz = socket.read(fd,1)
-	assert(sz,"closed")
-	sz =string.byte(sz)
-	local connect =assert(socket.read(fd,sz),"closed")
-	return mtask.unpack(connect)
+	local sz = socket.read(fd, 1)
+	assert(sz, "closed")
+	sz = string.byte(sz)
+	local content = assert(socket.read(fd, sz), "closed")
+	return mtask.unpack(content)
 end
 
 local function pack_package(...)
 	local message = mtask.packstring(...)
-	local size =#message
-	assert(size<=255,"too long !")
-	return string.char(size)..message
+	local size = #message
+	assert(size <= 255 , "too long")
+	return string.char(size) .. message
 end
 
-local function report_slave(fd,slave_id,slave_addr)
-	local message =pack_package("C",slave_id,slave_addr)
-	local n=0
+local function report_slave(fd, slave_id, slave_addr)
+	local message = pack_package("C", slave_id, slave_addr)
+	local n = 0
 	for k,v in pairs(slave_node) do
-		if v.fd ~=0 then
-			socket.write(v.fd,message)
-			n=n+1
+		if v.fd ~= 0 then
+			socket.write(v.fd, message)
+			n = n + 1
 		end
 	end
-	socket.write(fd,pack_package("W",n))
+	socket.write(fd, pack_package("W", n))
 end
 
 local function handshake(fd)
-	local t,slave_id,slave_addr = read_package(fd)
-	assert(t=='H',"Invalid handshake type"..t)
-	assert(slave_id~=0,"Invalid slave id 0")
+	local t, slave_id, slave_addr = read_package(fd)
+	assert(t=='H', "Invalid handshake type " .. t)
+	assert(slave_id ~= 0 , "Invalid slave id 0")
 	if slave_node[slave_id] then
-		error(string.format("Slave %d already register on %s",slave_id, slave_node[slave_id].addr))
+		error(string.format("Slave %d already register on %s", slave_id, slave_node[slave_id].addr))
 	end
-	report_slave(fd,slave_id,slave_addr)
+	report_slave(fd, slave_id, slave_addr)
 	slave_node[slave_id] = {
-		fd=fd,
-		id=slave_id,
-		addr=slave_addr,
+		fd = fd,
+		id = slave_id,
+		addr = slave_addr,
 	}
-	return slave_id ,slave_addr
+	return slave_id , slave_addr
 end
 
 local function dispatch_slave(fd)
-	local t,name,address = read_package(fd)
-	if t=='R' then
-		--register name
-		assert(type(address)=="number","Invalid request")
+	local t, name, address = read_package(fd)
+	if t == 'R' then
+		-- register name
+		assert(type(address)=="number", "Invalid request")
 		if not global_name[name] then
-			global_name[name]=address
+			global_name[name] = address
 		end
-		local message =pack_package("N",name,address)
+		local message = pack_package("N", name, address)
 		for k,v in pairs(slave_node) do
 			socket.write(v.fd, message)
 		end
-
-	elseif t=='Q' then
-		--query name
+	elseif t == 'Q' then
+		-- query name
 		local address = global_name[name]
 		if address then
-			socket.write(fd,pack_package("N", name, address))
+			socket.write(fd, pack_package("N", name, address))
 		end
-    else
-        mtask.error("Invalid slave message type"..t)
+	else
+		mtask.error("Invalid slave message type " .. t)
 	end
-end 
+end
 
-local function monitor_slave(slave_id,slave_addr)
+local function monitor_slave(slave_id, slave_address)
 	local fd = slave_node[slave_id].fd
 	mtask.error(string.format("Harbor %d (fd=%d) report %s", slave_id, fd, slave_address))
 	while pcall(dispatch_slave, fd) do end
@@ -125,9 +123,3 @@ mtask.start(function()
 		end
 	end)
 end)
-
-
-
-
-
-

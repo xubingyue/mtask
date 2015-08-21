@@ -1,5 +1,6 @@
 local mtask = require "mtask"
 local harbor = require "mtask.harbor"
+require "mtask.manager"	-- import mtask.monitor
 
 local function monitor_master()
 	harbor.linkmaster()

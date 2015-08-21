@@ -28,7 +28,7 @@ LUA_SERVICE = nil
 
 package.path , LUA_PATH = LUA_PATH
 package.cpath , LUA_CPATH = LUA_CPATH
-package.path = package.path ..";./skynet_web/?.lua;"
+package.path = package.path ..";./mtask_web/?.lua;"
 
 local service_path = string.match(pattern, "(.*/)[^/?]+$")
 

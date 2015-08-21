@@ -37,6 +37,16 @@ mtask.start(function()
 		mtask.error(string.format("b[%d]=%s", k,v))
 	end
 
+	-- test lua serialization
+	local s = mtask.packstring(obj)
+	local nobj = mtask.unpack(s)
+	for k,v in pairs(nobj) do
+		mtask.error(string.format("nobj[%s]=%s", k,v))
+	end
+	for k,v in ipairs(nobj.b) do
+		mtask.error(string.format("nobj.b[%d]=%s", k,v))
+	end
+
 	for i = 1, 5 do
 		mtask.sleep(100)
 		mtask.error("second " ..i)

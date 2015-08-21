@@ -22,12 +22,11 @@ mtask.start(function()
 	mtask.dispatch("lua", function (_,_,id)
 		socket.start(id)
 		-- limit request body size to 8192 (you can pass nil to unlimit)
-	    -- 一般的业务不需要处理大量上行数据，为了防止攻击，做了一个 8K 限制。这个限制可以去掉。
 		local code, url, method, header, body = httpd.read_request(sockethelper.readfunc(id), 8192)
 		if code then
-			if code ~= 200 then --如果协议解析有问题，就回应一个错误码 code 。
+			if code ~= 200 then
 				response(id, code)
-			else   -- 这是一个示范的回应过程，你可以根据你的实际需要，解析 url, method 和 header 做出回应。
+			else
 				local tmp = {}
 				if header.host then
 					table.insert(tmp, string.format("host: %s", header.host))
@@ -47,8 +46,7 @@ mtask.start(function()
 				table.insert(tmp, "-----body----\n" .. body)
 				response(id, code, table.concat(tmp,"\n"))
 			end
-		else 
-			-- 如果抛出的异常是 sockethelper.socket_error 表示是客户端网络断开了。
+		else
 			if url == sockethelper.socket_error then
 				mtask.error("socket closed")
 			else
@@ -63,15 +61,13 @@ else
 
 mtask.start(function()
 	local agent = {}
-	for i= 1, 20 do -- 启动 20 个代理服务用于处理 http 请求
+	for i= 1, 20 do
 		agent[i] = mtask.newservice(SERVICE_NAME, "agent")
 	end
 	local balance = 1
-    -- 监听一个 web 端口
 	local id = socket.listen("0.0.0.0", 8001)
 	mtask.error("Listen web port 8001")
 	socket.start(id , function(id, addr)
-		-- 当一个http请求到达的时候,把socket id分发到事先准备好的代理中去处理。
 		mtask.error(string.format("%s connected, pass it to agent :%08x", addr, agent[balance]))
 		mtask.send(agent[balance], "lua", id)
 		balance = balance + 1

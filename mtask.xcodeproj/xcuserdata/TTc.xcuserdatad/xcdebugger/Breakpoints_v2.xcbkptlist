@@ -17,38 +17,6 @@
             endingLineNumber = "169"
             landmarkName = "snlua_init()"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "snlua_create"
-                  moduleName = "mtask"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/administrator/Documents/mtask/service-src/mtask_snlua.c"
-                  timestampString = "461732588.025231"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "169"
-                  endingLineNumber = "169"
-                  offsetFromSymbolStart = "15">
-               </Location>
-               <Location
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "snlua_create"
-                  moduleName = "snlua.so"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/administrator/Documents/mtask/service-src/mtask_snlua.c"
-                  timestampString = "461732589.409654"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "169"
-                  endingLineNumber = "169"
-                  offsetFromSymbolStart = "11">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -65,38 +33,6 @@
             endingLineNumber = "153"
             landmarkName = "_launch()"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "snlua_init"
-                  moduleName = "mtask"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/administrator/Documents/mtask/service-src/mtask_snlua.c"
-                  timestampString = "461732588.026128"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "153"
-                  endingLineNumber = "153"
-                  offsetFromSymbolStart = "20">
-               </Location>
-               <Location
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "snlua_init"
-                  moduleName = "snlua.so"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/administrator/Documents/mtask/service-src/mtask_snlua.c"
-                  timestampString = "461732589.41027"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "153"
-                  endingLineNumber = "153"
-                  offsetFromSymbolStart = "23">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -127,38 +63,6 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "143"
             endingLineNumber = "143">
-            <Locations>
-               <Location
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "_launch"
-                  moduleName = "mtask"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/administrator/Documents/mtask/service-src/mtask_snlua.c"
-                  timestampString = "461732588.027446"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "143"
-                  endingLineNumber = "143"
-                  offsetFromSymbolStart = "163">
-               </Location>
-               <Location
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "_launch"
-                  moduleName = "snlua.so"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/administrator/Documents/mtask/service-src/mtask_snlua.c"
-                  timestampString = "461732589.410632"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "146"
-                  endingLineNumber = "146"
-                  offsetFromSymbolStart = "545">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>

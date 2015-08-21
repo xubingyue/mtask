@@ -17,7 +17,6 @@ function server.login_handler(uid, secret)
 	end
 
 	internal_id = internal_id + 1
-	-- local username = msgserver.username(uid, internal_id, servername)
 	local id = internal_id	-- don't use internal_id directly
 	local username = msgserver.username(uid, id, servername)
 
@@ -75,9 +74,9 @@ function server.disconnect_handler(username)
 end
 
 -- call by self (when recv a request from client)
-function server.request_handler(username, msg, sz)
+function server.request_handler(username, msg)
 	local u = username_map[username]
-	return mtask.tostring(mtask.rawcall(u.agent, "client", msg, sz))
+	return mtask.tostring(mtask.rawcall(u.agent, "client", msg))
 end
 
 -- call by self (when gate open)

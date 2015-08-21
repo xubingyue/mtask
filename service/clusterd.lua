@@ -1,25 +1,17 @@
-local mtasklocal mtask = require "mtask"
+local mtask = require "mtask"
 local sc = require "socketchannel"
 local socket = require "socket"
 local cluster = require "cluster.core"
 
 local config_name = mtask.getenv "cluster"
 local node_address = {}
-
-local function loadconfig()
-	local f = assert(io.open(config_name))
-	local source =f:read "*a"
-	f:close()
-	assert(load(source,"@"..config_name,"t",node_address))()
-end
-
-local node_session={}
+local node_session = {}
 local command = {}
 
 local function read_response(sock)
 	local sz = socket.header(sock:read(2))
 	local msg = sock:read(sz)
-	return cluster.unpackresponse(msg)-- session, ok, data
+	return cluster.unpackresponse(msg)	-- session, ok, data, padding
 end
 
 local function open_channel(t, key)
@@ -28,14 +20,32 @@ local function open_channel(t, key)
 		host = host,
 		port = tonumber(port),
 		response = read_response,
+		nodelay = true,
 	}
 	assert(c:connect(true))
 	t[key] = c
-	node_session[key] = 1
 	return c
 end
 
 local node_channel = setmetatable({}, { __index = open_channel })
+
+local function loadconfig()
+	local f = assert(io.open(config_name))
+	local source = f:read "*a"
+	f:close()
+	local tmp = {}
+	assert(load(source, "@"..config_name, "t", tmp))()
+	for name,address in pairs(tmp) do
+		assert(type(address) == "string")
+		if node_address[name] ~= address then
+			-- address changed
+			if rawget(node_channel, name) then
+				node_channel[name] = nil	-- reset connection
+			end
+			node_address[name] = address
+		end
+	end
+end
 
 function command.reload()
 	loadconfig()
@@ -52,19 +62,25 @@ function command.listen(source, addr, port)
 end
 
 local function send_request(source, node, addr, msg, sz)
-	local request
-	local c = node_channel[node]
-	local session = node_session[node]
+	local session = node_session[node] or 1
 	-- msg is a local pointer, cluster.packrequest will free it
-	request, node_session[node] = cluster.packrequest(addr, session , msg, sz)
+	local request, new_session, padding = cluster.packrequest(addr, session, msg, sz)
+	node_session[node] = new_session
 
-	return c:request(request, session)
+	-- node_channel[node] may yield or throw error
+	local c = node_channel[node]
+
+	return c:request(request, session, padding)
 end
 
 function command.req(...)
 	local ok, msg, sz = pcall(send_request, ...)
 	if ok then
-		mtask.ret(msg, sz)
+		if type(msg) == "table" then
+			mtask.ret(cluster.concat(msg))
+		else
+			mtask.ret(msg)
+		end
 	else
 		mtask.error(msg)
 		mtask.response()(false)
@@ -81,31 +97,86 @@ function command.proxy(source, node, name)
 	mtask.ret(mtask.pack(proxy[fullname]))
 end
 
-local request_fd = {}
+local register_name = {}
+
+function command.register(source, name, addr)
+	assert(register_name[name] == nil)
+	addr = addr or source
+	local old_name = register_name[addr]
+	if old_name then
+		register_name[old_name] = nil
+	end
+	register_name[addr] = name
+	register_name[name] = addr
+	mtask.ret(nil)
+	mtask.error(string.format("Register [%s] :%08x", name, addr))
+end
+
+local large_request = {}
 
 function command.socket(source, subcmd, fd, msg)
 	if subcmd == "data" then
-		local addr, session, msg = cluster.unpackrequest(msg)
-		local ok , msg, sz = pcall(mtask.rawcall, addr, "lua", msg)
-		local response
+		local sz
+		local addr, session, msg, padding = cluster.unpackrequest(msg)
+		if padding then
+			local req = large_request[session] or { addr = addr }
+			large_request[session] = req
+			table.insert(req, msg)
+			return
+		else
+			local req = large_request[session]
+			if req then
+				large_request[session] = nil
+				table.insert(req, msg)
+				msg,sz = cluster.concat(req)
+				addr = req.addr
+			end
+			if not msg then
+				local response = cluster.packresponse(session, false, "Invalid large req")
+				socket.write(fd, response)
+				return
+			end
+		end
+		local ok, response
+		if addr == 0 then
+			local name = mtask.unpack(msg, sz)
+			local addr = register_name[name]
+			if addr then
+				ok = true
+				msg, sz = mtask.pack(addr)
+			else
+				ok = false
+				msg = "name not found"
+			end
+		else
+			ok , msg, sz = pcall(mtask.rawcall, addr, "lua", msg, sz)
+		end
 		if ok then
 			response = cluster.packresponse(session, true, msg, sz)
+			if type(response) == "table" then
+				for _, v in ipairs(response) do
+					socket.lwrite(fd, v)
+				end
+			else
+				socket.write(fd, response)
+			end
 		else
 			response = cluster.packresponse(session, false, msg)
+			socket.write(fd, response)
 		end
-		socket.write(fd, response)
 	elseif subcmd == "open" then
 		mtask.error(string.format("socket accept from %s", msg))
 		mtask.call(source, "lua", "accept", fd)
 	else
+		large_request = {}
 		mtask.error(string.format("socket %s %d : %s", subcmd, fd, msg))
 	end
 end
 
 mtask.start(function()
 	loadconfig()
-	mtask.dispatch("lua",function(session,source,cmd,... )
-		local f= assert(command[cmd])
-		f(source,...)
+	mtask.dispatch("lua", function(session , source, cmd, ...)
+		local f = assert(command[cmd])
+		f(source, ...)
 	end)
 end)

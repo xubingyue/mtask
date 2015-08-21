@@ -42,7 +42,7 @@ Protocol:
 		dword session
 
 API:
-	server.userid(username) --uid, subid, server 把一个登陆名转换为 uid, subid, servername 三元组
+	server.userid(username)
 		return uid, subid, server
 
 	server.username(uid, subid, server)
@@ -70,7 +70,7 @@ Config for server.start:
 	conf.login_handler(uid, secret) -> subid : the function when a new user login, alloc a subid for it. (may call by login server)
 	conf.logout_handler(uid, subid) : the functon when a user logout. (may call by agent)
 	conf.kick_handler(uid, subid) : the functon when a user logout. (may call by login server)
-	conf.request_handler(username, session, msg, sz) : the function when recv a new request.
+	conf.request_handler(username, session, msg) : the function when recv a new request.
 	conf.register_handler(servername) : call when gate open
 	conf.disconnect_handler(username) : call when a connection disconnect (afk)
 ]]
@@ -92,11 +92,11 @@ function server.userid(username)
 	return b64decode(uid), b64decode(subid), b64decode(servername)
 end
 
-function server.username(uid, subid, servername)-- username 把 uid, subid, servername 三元组构造成一个登陆名
+function server.username(uid, subid, servername)
 	return string.format("%s@%s#%s", b64encode(uid), b64encode(servername), b64encode(tostring(subid)))
 end
 
-function server.logout(username)--让一个登陆名失效(登出),通常在logout_handler里调用。
+function server.logout(username)
 	local u = user_online[username]
 	user_online[username] = nil
 	if u.fd then
@@ -105,7 +105,7 @@ function server.logout(username)--让一个登陆名失效(登出),通常在logo
 	end
 end
 
-function server.login(username, secret)--你需要在login_handler中调用它,注册一个登陆名对应的 serect
+function server.login(username, secret)
 	assert(user_online[username] == nil)
 	user_online[username] = {
 		secret = secret,
@@ -116,14 +116,14 @@ function server.login(username, secret)--你需要在login_handler中调用它,�
 	}
 end
 
-function server.ip(username)--查询一个登陆名对应的连接的 ip 地址，如果没有关联的连接，会返回 nil 。
+function server.ip(username)
 	local u = user_online[username]
 	if u and u.fd then
 		return u.ip
 	end
 end
 
-function server.start(conf)--启动一个 msgserver. conf 是配置表。配置表和 GateServer 相同，但增加一项 servername ，你需要配置这个登陆点的名字。
+function server.start(conf)
 	local expired_number = conf.expired_number or 128
 
 	local handler = {}
@@ -178,7 +178,7 @@ function server.start(conf)--启动一个 msgserver. conf 是配置表。配置�
 		end
 
 		local text = string.format("%s:%s", username, index)
-		local v = crypt.hmac64(crypt.hashkey(text), u.secret)
+		local v = crypt.hmac_hash(u.secret, text)	-- equivalent to crypt.hmac64(crypt.hashkey(text), u.secret)
 		if v ~= hmac then
 			return "401 Unauthorized"
 		end
@@ -234,10 +234,10 @@ function server.start(conf)--启动一个 msgserver. conf 是配置表。配置�
 		end
 	end
 
-	local function do_request(fd, msg, sz)
+	local function do_request(fd, message)
 		local u = assert(connection[fd], "invalid fd")
-		local msg_sz = sz - 4
-		local session = netpack.tostring(msg, sz, msg_sz)
+		local session = string.unpack(">I4", message, -4)
+		message = message:sub(1,-5)
 		local p = u.response[session]
 		if p then
 			-- session can be reuse in the same connection
@@ -256,21 +256,20 @@ function server.start(conf)--启动一个 msgserver. conf 是配置表。配置�
 		if p == nil then
 			p = { fd }
 			u.response[session] = p
-			local ok, result = pcall(conf.request_handler, u.username, msg, msg_sz)
-			result = result or ""
+			local ok, result = pcall(conf.request_handler, u.username, message)
 			-- NOTICE: YIELD here, socket may close.
+			result = result or ""
 			if not ok then
 				mtask.error(result)
-				result = "\0" .. session
+				result = string.pack(">BI4", 0, session)
 			else
-				result = result .. '\1' .. session
+				result = result .. string.pack(">BI4", 1, session)
 			end
 
-			p[2] = netpack.pack_string(result)
+			p[2] = string.pack(">s2",result)
 			p[3] = u.version
 			p[4] = u.index
 		else
-			netpack.tostring(msg, sz) -- request before, so free msg
 			-- update version/index, change return fd.
 			-- resend response.
 			p[1] = fd
@@ -292,10 +291,11 @@ function server.start(conf)--启动一个 msgserver. conf 是配置表。配置�
 	end
 
 	local function request(fd, msg, sz)
-		local ok, err = pcall(do_request, fd, msg, sz)
+		local message = netpack.tostring(msg, sz)
+		local ok, err = pcall(do_request, fd, message)
 		-- not atomic, may yield
 		if not ok then
-			mtask.error(string.format("Invalid package %s : %s", err, netpack.tostring(msg, sz)))
+			mtask.error(string.format("Invalid package %s : %s", err, message))
 			if connection[fd] then
 				gateserver.closeclient(fd)
 			end

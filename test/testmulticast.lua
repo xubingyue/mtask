@@ -3,11 +3,10 @@ local mc = require "multicast"
 local dc = require "datacenter"
 
 local mode = ...
-print("mode==>",mode)
+
 if mode == "sub" then
 
 mtask.start(function()
-	print("111111")
 	mtask.dispatch("lua", function (_,_, cmd, channel)
 		assert(cmd == "init")
 		local c = mc.new {
@@ -25,8 +24,7 @@ end)
 else
 
 mtask.start(function()
-	print("2222")
-	local channel = mc.new() -- 创建一个频道，成功创建后，.channel 是这个频道的 id 。
+	local channel = mc.new()
 	print("New channel", channel)
 	for i=1,10 do
 		local sub = mtask.newservice(SERVICE_NAME, "sub")

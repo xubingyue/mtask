@@ -2,72 +2,62 @@ package.cpath = "luaclib/?.so"
 
 local socket = require "clientsocket"
 local crypt = require "crypt"
-local bit32 = require "bit32"
 
---连接到登陆服
+if _VERSION ~= "Lua 5.3" then
+	error "Use lua 5.3"
+end
+
 local fd = assert(socket.connect("127.0.0.1", 8001))
 
---向socket写入一行函数
 local function writeline(fd, text)
-	socket.send(fd, text .. "\n")--text加一个换行符
+	socket.send(fd, text .. "\n")
 end
 
---从接收到的数据中解包出一行
 local function unpack_line(text)
-	local from = text:find("\n", 1, true)--找到一行
-	if from then--找到换行符
-		return text:sub(1, from-1), text:sub(from+1)--返回一行和剩余的text
+	local from = text:find("\n", 1, true)
+	if from then
+		return text:sub(1, from-1), text:sub(from+1)
 	end
-	return nil, text--返回空和传入的text
+	return nil, text
 end
 
-local last = ""--收到的数据
+local last = ""
 
---使用解包函数f从数据中解出一条完整数据（完整的定义由协议确定，比如unpack_line是以一个换行符分隔）
---每调用一次unpack_f返回的匿名函数时，都会用传入的解包函数f从数据中解包出一条完整的数据
---如果没有解包到一条完整的数据，会不断循环接收数据->解包->休眠，直到解包出一条完整的数据
 local function unpack_f(f)
-	local function try_recv(fd, last)--尝试接收数据函数
+	local function try_recv(fd, last)
 		local result
-		result, last = f(last)--解包数据
-		if result then--拿到一条完整的数据
-			return result, last--返回完整的数据和剩余数据
+		result, last = f(last)
+		if result then
+			return result, last
 		end
-		local r = socket.recv(fd)--读取数据
-		if not r then--如果数据为空
-			return nil, last--返回nil和当前的数据
+		local r = socket.recv(fd)
+		if not r then
+			return nil, last
 		end
-		if r == "" then--如果r为空字符串
-			error "Server closed"--报告服务器关闭
+		if r == "" then
+			error "Server closed"
 		end
-		return f(last .. r)--将剩余数据和收到的数据合并并继续解包
+		return f(last .. r)
 	end
 
 	return function()
-		while true do--循环直到拿到一条完整的数据
+		while true do
 			local result
 			result, last = try_recv(fd, last)
-			if result then--拿到一条完整的数据
-				return result--返回
+			if result then
+				return result
 			end
-			socket.usleep(100)--休眠一会儿
+			socket.usleep(100)
 		end
 	end
 end
 
---读取一行函数
 local readline = unpack_f(unpack_line)
 
-local challenge = crypt.base64decode(readline())--获取服务器发送过来的挑战码（8字节长的随机串，用于后续的握手验证）
+local challenge = crypt.base64decode(readline())
 
-local clientkey = crypt.randomkey()--生成一个随机的key
-
---1.利用 DH 密钥交换算法加密生成的clientkey
---2.再用base64编码
---3.发送到服务器
+local clientkey = crypt.randomkey()
 writeline(fd, crypt.base64encode(crypt.dhexchange(clientkey)))
-
-
 local secret = crypt.dhsecret(crypt.base64decode(readline()), clientkey)
 
 print("sceret is ", crypt.hexencode(secret))
@@ -106,26 +96,14 @@ print("login ok, subid=", subid)
 
 local function send_request(v, session)
 	local size = #v + 4
-	local package = string.char(bit32.extract(size,8,8))..
-		string.char(bit32.extract(size,0,8))..
-		v..
-		string.char(bit32.extract(session,24,8))..
-		string.char(bit32.extract(session,16,8))..
-		string.char(bit32.extract(session,8,8))..
-		string.char(bit32.extract(session,0,8))
-
+	local package = string.pack(">I2", size)..v..string.pack(">I4", session)
 	socket.send(fd, package)
 	return v, session
 end
 
 local function recv_response(v)
-	local content = v:sub(1,-6)
-	local ok = v:sub(-5,-5):byte()
-	local session = 0
-	for i=-4,-1 do
-		local c = v:byte(i)
-		session = session + bit32.lshift(c,(-1-i) * 8)
-	end
+	local size = #v - 5
+	local content, ok, session = string.unpack("c"..tostring(size).."B>I4", v)
 	return ok ~=0 , content, session
 end
 
@@ -145,11 +123,7 @@ end
 local readpackage = unpack_f(unpack_package)
 
 local function send_package(fd, pack)
-	local size = #pack
-	local package = string.char(bit32.extract(size,8,8))..
-		string.char(bit32.extract(size,0,8))..
-		pack
-
+	local package = string.pack(">s2", pack)
 	socket.send(fd, package)
 end
 
@@ -157,7 +131,7 @@ local text = "echo"
 local index = 1
 
 print("connect")
-local fd = assert(socket.connect("127.0.0.1", 8888))
+fd = assert(socket.connect("127.0.0.1", 8888))
 last = ""
 
 local handshake = string.format("%s@%s#%s:%d", crypt.base64encode(token.user), crypt.base64encode(token.server),crypt.base64encode(subid) , index)
@@ -177,7 +151,7 @@ socket.close(fd)
 index = index + 1
 
 print("connect again")
-local fd = assert(socket.connect("127.0.0.1", 8888))
+fd = assert(socket.connect("127.0.0.1", 8888))
 last = ""
 
 local handshake = string.format("%s@%s#%s:%d", crypt.base64encode(token.user), crypt.base64encode(token.server),crypt.base64encode(subid) , index)

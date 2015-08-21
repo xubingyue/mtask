@@ -19,7 +19,6 @@ end
 
 local node_address = setmetatable({}, { __index = get_address })
 
--- 创建一个频道，成功创建后，.ret 是这个频道的 id 。
 -- new LOCAL channel , The low 8bit is the same with harbor_id
 function command.NEW()
 	while channel[channel_id] do
@@ -33,7 +32,6 @@ function command.NEW()
 end
 
 -- MUST call by the owner node of channel, delete a remote channel
--- 删除一个远程remote频道
 function command.DELR(source, c)
 	channel[c] = nil
 	channel_n[c] = nil
@@ -42,7 +40,6 @@ end
 
 -- delete a channel, if the channel is remote, forward the command to the owner node
 -- otherwise, delete the channel, and call all the remote node, DELR
--- 当一个频道不再使用，你可以调用 channel:delete() 让系统回收它。注：多次调用 channel:delete 是无害的，因为 channel id 不会重复使用。在频道被销毁后再调用 subscribe 或 publish 等也不会引起异常，但订阅是不起作用的，消息也不再广播
 function command.DEL(source, c)
 	local node = c % 256
 	if node ~= harbor_id then
@@ -68,7 +65,6 @@ end
 
 -- publish a message, for local node, use the message pointer (call mc.bind to add the reference)
 -- for remote node, call remote_publish. (call mc.unpack and mtask.tostring to convert message pointer to string)
---可以向一个频道发布消息。消息可以是任意数量合法的 lua 值。
 local function publish(c , source, pack, size)
 	local group = channel[c]
 	if group == nil then
@@ -120,7 +116,6 @@ end
 -- MUST call by channel owner node (assert source is not local and channel is create by self)
 -- If channel is not exist, return true
 -- Else set channel_remote[channel] true
---光绑定到一个频道后，默认并不接收这个频道上的消息（也许你只想向这个频道发布消息）。你需要先调用 channel:subscribe() 订阅它。
 function command.SUBR(source, c)
 	local node = mtask.harbor(source)
 	if not channel[c] then
@@ -170,7 +165,6 @@ function command.USUBR(source, c)
 end
 
 -- Unsubscribe a channel, if the subscriber is empty and the channel is remote, send USUBR to the channel owner
---如果不再想收到该频道的消息，调用 channel:unsubscribe 。
 function command.USUB(source, c)
 	local group = assert(channel[c])
 	if group[source] then

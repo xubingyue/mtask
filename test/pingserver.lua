@@ -1,12 +1,9 @@
---RPC远程调用
 local mtask = require "mtask"
 local queue = require "mtask.queue"
 local snax = require "snax"
 
 local i = 0
 local hello = "hello"
---要定义这类远程方法，可以通过定义 function response.foobar(...)来声明一个远程方法。
---foobar 是方法名,response 前缀表示这个方法一定有一个回应。你可以通过函数返回值来回应远程调用。
 
 function response.ping(hello)
 	mtask.sleep(100)
@@ -20,25 +17,23 @@ function accept.sleep(queue, n)
 	if queue then
 		lock(
 		function()
-			print("accept.sleep－－－》queue=",queue, n)
+			print("queue=",queue, n)
 			mtask.sleep(n)
 		end)
 	else
-		print("accept.sleep－－>queue=",queue, n)
+		print("queue=",queue, n)
 		mtask.sleep(n)
 	end
 end
 
 function accept.hello()
-	print("accept.hello called....")
 	lock(function()
 	i = i + 1
-	print ("accept.hello===>",i, hello)
+	print (i, hello)
 	end)
 end
 
 function accept.exit(...)
-	print("snax.exit",...)
 	snax.exit(...)
 end
 
@@ -48,6 +43,7 @@ end
 
 function init( ... )
 	print ("ping server start:", ...)
+	snax.enablecluster()	-- enable cluster call
 	-- init queue
 	lock = queue()
 end

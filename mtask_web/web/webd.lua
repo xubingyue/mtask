@@ -1,4 +1,4 @@
-local skynet = require "skynet"
+local mtask = require "mtask"
 local socket = require "socket"
 local httpd = require "http.httpd"
 local sockethelper = require "http.sockethelper"
@@ -18,7 +18,7 @@ local function response(id, ...)
    local ok, err = httpd.write_response(sockethelper.writefunc(id), ...)
    if not ok then
       -- if err == sockethelper.socket_error , that means socket closed.
-      skynet.error(string.format("fd = %d, %s", id, err))
+      mtask.error(string.format("fd = %d, %s", id, err))
    end
 end
 
@@ -82,8 +82,8 @@ local function open_file(id,file_path)
    local root = web_root
    local key = root..file_path
    local data 
-   local cache = skynet.queryservice(SERVICE_NAME)
-   data = skynet.call(cache,"lua","get",key)
+   local cache = mtask.queryservice(SERVICE_NAME)
+   data = mtask.call(cache,"lua","get",key)
 
    if not data then
       local file = io.open(key, "rb") 
@@ -99,7 +99,7 @@ local function open_file(id,file_path)
       file:seek("set", 0)   
       data = file:read("*a")
       file:close()  
-      skynet.call(cache,"lua","set",key,data)
+      mtask.call(cache,"lua","set",key,data)
 
    end
 
@@ -138,9 +138,9 @@ local CMD = {
           	 end
       else
           	 if url == sockethelper.socket_error then
-          	    skynet.error("socket closed")
+          	    mtask.error("socket closed")
           	 else
-          	    skynet.error(url)
+          	    mtask.error(url)
           	 end
                 end
                 socket.close(id)
@@ -152,8 +152,8 @@ local CMD = {
              end
 }
 
-skynet.start(function()
-		skynet.dispatch("lua", function (_,_,cmd,...)
+mtask.start(function()
+		mtask.dispatch("lua", function (_,_,cmd,...)
 				   CMD[cmd](...)
 		end)
 end)
@@ -179,16 +179,16 @@ elseif mode =="master" then
         	 local agent = {}
 
         	 for i= 1, thread do
-        	    agent[i] = skynet.newservice(SERVICE_NAME, "agent")
-        	    skynet.send(agent[i],"lua","init",config)
+        	    agent[i] = mtask.newservice(SERVICE_NAME, "agent")
+        	    mtask.send(agent[i],"lua","init",config)
         	 end
 
         	 local balance = 1
         	 local id = socket.listen("0.0.0.0", port)
-        	 local ss = skynet.uniqueservice(SERVICE_NAME)
+        	 local ss = mtask.uniqueservice(SERVICE_NAME)
 
         	 socket.start(id , function(id, addr)				   
-        			 skynet.send(agent[balance], "lua","start",id)
+        			 mtask.send(agent[balance], "lua","start",id)
         			 balance = balance + 1
         			 if balance > #agent then
         			    balance = 1
@@ -196,36 +196,36 @@ elseif mode =="master" then
         	 end)
 
         	 state = "start"
-        	 skynet.ret(skynet.pack(true))
+        	 mtask.ret(mtask.pack(true))
               end,
               
               use = function(pattern,middle_ware)
 
         	 if state ~= "init" then
         	    print("server has start!!!")
-        	    skynet.ret(skynet.pack(false,"server has start!"))
+        	    mtask.ret(mtask.pack(false,"server has start!"))
         	 end
         	 table.insert(middle_wares,{pattern=pattern,middle_ware=middle_ware})
       end
    }
    
    
-   skynet.start(function(...)		   
-		   skynet.dispatch("lua",function(_,_,cmd,...)
+   mtask.start(function(...)		   
+		   mtask.dispatch("lua",function(_,_,cmd,...)
 				      CMD[cmd](...)
 		   end)
    end)
    
 else
    local file_caches = {}
-   skynet.start(function(...)
-		   skynet.dispatch("lua", function (_,_, cmd,key,value)
+   mtask.start(function(...)
+		   mtask.dispatch("lua", function (_,_, cmd,key,value)
 				      if cmd == "get" then
 					 local v = file_caches[key]
-					 skynet.ret(skynet.pack(v))
+					 mtask.ret(mtask.pack(v))
 				      elseif cmd == "set" then
 					 file_caches[key] = value
-					 skynet.ret(skynet.pack(true))
+					 mtask.ret(mtask.pack(true))
 				      else
 					 print("not support :",cmd)
 				      end

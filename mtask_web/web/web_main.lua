@@ -1,12 +1,12 @@
-local skynet = require "skynet"
+local mtask = require "mtask"
 local httpc = require "http.httpc"
 local express = require "web.express"
 
-skynet.start(function()
+mtask.start(function()
 	-- body
 	print("web http server start....")
 	local web = express.app(8001,{
-		web_root = "./skynet_web/www",
+		web_root = "./mtask_web/www",
 		thread = 2,
 		static_regular = ".js|.html|.css|.pb|.png"
 		})
@@ -18,6 +18,6 @@ skynet.start(function()
 
 	local status, body1 = httpc.get("127.0.0.1:8001", "/test.html", {})
 	print("333========",status,body1)
-	skynet.sleep(5000)
-	skynet.exit()
+	mtask.sleep(5000)
+	mtask.exit()
 end)

@@ -1,16 +1,39 @@
---多lua 用 sprotoloader的模块来共享 VM里都加载相同的sproto协议定义。
-
---其实现原理是在C模块中提供了16个全局的slot可以通过sprotoloader.register或sprotoloader.save
---在初始化时,加载需要的协议,并保存在这些slot里.通常我们只需要两个slot,一个用于保存客户端到服务器的协议组，
---另一个用于保存服务器到客户端的协议组。分别位于 slot 1 和 2 。
---这样，在每个 vm 内，都可以通过 sprotoloader.load 把协议加载到 vm 中。
---注意：这套 api 并非线程安全。所以必须自行保证在初始化完毕后再做 load 操作。
---（load 本身是线程安全的）。
-
-
 local lpeg = require "lpeg"
-local bit32 = require "bit32"
 local table = require "table"
+
+local packbytes
+local packvalue
+
+if _VERSION == "Lua 5.3" then
+	function packbytes(str)
+		return string.pack("<s4",str)
+	end
+
+	function packvalue(id)
+		id = (id + 1) * 2
+		return string.pack("<I2",id)
+	end
+else
+	function packbytes(str)
+		local size = #str
+		local a = size % 256
+		size = math.floor(size / 256)
+		local b = size % 256
+		size = math.floor(size / 256)
+		local c = size % 256
+		size = math.floor(size / 256)
+		local d = size
+		return string.char(a)..string.char(b)..string.char(c)..string.char(d) .. str
+	end
+
+	function packvalue(id)
+		id = (id + 1) * 2
+		assert(id >=0 and id < 65536)
+		local a = id % 256
+		local b = math.floor(id / 256)
+		return string.char(a) .. string.char(b)
+	end
+end
 
 local P = lpeg.P
 local S = lpeg.S
@@ -46,6 +69,7 @@ local word = alpha * alnum ^ 0
 local name = C(word)
 local typename = C(word * ("." * word) ^ 0)
 local tag = R"09" ^ 1 / tonumber
+local mainkey = "(" * blank0 * name * blank0 * ")"
 
 local function multipat(pat)
 	return Ct(blank0 * (pat * blanks) ^ 0 * pat^0 * blank0)
@@ -57,10 +81,10 @@ end
 
 local typedef = P {
 	"ALL",
-	FIELD = namedpat("field", (name * blanks * tag * blank0 * ":" * blank0 * (C"*")^0 * typename)),
+	FIELD = namedpat("field", (name * blanks * tag * blank0 * ":" * blank0 * (C"*")^-1 * typename * mainkey^0)),
 	STRUCT = P"{" * multipat(V"FIELD" + V"TYPE") * P"}",
 	TYPE = namedpat("type", P"." * name * blank0 * V"STRUCT" ),
-	SUBPROTO = Ct((C"request" + C"response") * blanks * (name + V"STRUCT")),
+	SUBPROTO = Ct((C"request" + C"response") * blanks * (typename + V"STRUCT")),
 	PROTOCOL = namedpat("protocol", name * blanks * tag * blank0 * P"{" * multipat(V"SUBPROTO") * P"}"),
 	ALL = multipat(V"TYPE" + V"PROTOCOL"),
 }
@@ -107,6 +131,11 @@ function convert.type(all, obj)
 			if fieldtype == "*" then
 				field.array = true
 				fieldtype = f[4]
+			end
+			local mainkey = f[5]
+			if mainkey then
+				assert(field.array)
+				field.key = mainkey
 			end
 			field.typename = fieldtype
 		else
@@ -157,6 +186,32 @@ local function checktype(types, ptype, t)
 	end
 end
 
+local function check_protocol(r)
+	local map = {}
+	local type = r.type
+	for name, v in pairs(r.protocol) do
+		local tag = v.tag
+		local request = v.request
+		local response = v.response
+		local p = map[tag]
+
+		if p then
+			error(string.format("redefined protocol tag %d at %s", tag, name))
+		end
+
+		if request and not type[request] then
+			error(string.format("Undefined request type %s in protocol %s", request, name))
+		end
+
+		if response and not type[response] then
+			error(string.format("Undefined response type %s in protocol %s", response, name))
+		end
+
+		map[tag] = v
+	end
+	return r
+end
+
 local function flattypename(r)
 	for typename, t in pairs(r.type) do
 		for _, f in pairs(t) do
@@ -175,7 +230,7 @@ end
 local function parser(text,filename)
 	local state = { file = filename, pos = 0, line = 1 }
 	local r = lpeg.match(proto * -1 + exception , text , 1, state )
-	return flattypename(adjust(r))
+	return flattypename(check_protocol(adjust(r)))
 end
 
 --[[
@@ -187,6 +242,7 @@ end
 		type 2 : integer
 		tag	3 :	integer
 		array 4	: boolean
+		key 5 : integer # If key exists, array must be true, and it's a map.
 	}
 	name 0 : string
 	fields 1 : *field
@@ -205,29 +261,18 @@ end
 }
 ]]
 
-local function packbytes(str)
-	local size = #str
-	return string.char(bit32.extract(size,0,8))..
-		string.char(bit32.extract(size,8,8))..
-		string.char(bit32.extract(size,16,8))..
-		string.char(bit32.extract(size,24,8))..
-		str
-end
-
-local function packvalue(id)
-	id = (id + 1) * 2
-	assert(id >=0 and id < 65536)
-	return string.char(bit32.extract(id, 0, 8)) .. string.char(bit32.extract(id, 8, 8))
-end
-
 local function packfield(f)
 	local strtbl = {}
 	if f.array then
-		table.insert(strtbl, "\5\0")  -- 5 fields
+		if f.key then
+			table.insert(strtbl, "\6\0")  -- 6 fields
+		else
+			table.insert(strtbl, "\5\0")  -- 5 fields
+		end
 	else
 		table.insert(strtbl, "\4\0")	-- 4 fields
 	end
-	table.insert(strtbl, "\0\0")	-- name	(tag = 0, ref =0)
+	table.insert(strtbl, "\0\0")	-- name	(tag = 0, ref an object)
 	if f.buildin then
 		table.insert(strtbl, packvalue(f.buildin))	-- buildin (tag = 1)
 		table.insert(strtbl, "\1\0")	-- skip (tag = 2)
@@ -240,7 +285,10 @@ local function packfield(f)
 	if f.array then
 		table.insert(strtbl, packvalue(1))	-- array = true (tag = 4)
 	end
-	table.insert(strtbl, packbytes(f.name))
+	if f.key then
+		table.insert(strtbl, packvalue(f.key)) -- key tag (tag = 5)
+	end
+	table.insert(strtbl, packbytes(f.name)) -- external object (name)
 	return packbytes(table.concat(strtbl))
 end
 
@@ -253,11 +301,22 @@ local function packtype(name, t, alltypes)
 		tmp.tag = f.tag
 
 		tmp.buildin = buildin_types[f.typename]
+		local subtype
 		if not tmp.buildin then
-			tmp.type = assert(alltypes[f.typename])
+			subtype = assert(alltypes[f.typename])
+			tmp.type = subtype.id
 		else
 			tmp.type = nil
 		end
+		if f.key then
+			tmp.key = subtype.fields[f.key]
+			if not tmp.key then
+				error("Invalid map index :" .. f.key)
+			end
+		else
+			tmp.key = nil
+		end
+
 		table.insert(fields, packfield(tmp))
 	end
 	local data
@@ -281,14 +340,12 @@ local function packtype(name, t, alltypes)
 end
 
 local function packproto(name, p, alltypes)
---	if p.request == nil then
---		error(string.format("Protocol %s need request", name))
---	end
 	if p.request then
 		local request = alltypes[p.request]
 		if request == nil then
 			error(string.format("Protocol %s request type %s not found", name, p.request))
 		end
+		request = request.id
 	end
 	local tmp = {
 		"\4\0",	-- 4 fields
@@ -299,12 +356,12 @@ local function packproto(name, p, alltypes)
 		tmp[1] = "\2\0"
 	else
 		if p.request then
-			table.insert(tmp, packvalue(alltypes[p.request])) -- request typename (tag=2)
+			table.insert(tmp, packvalue(alltypes[p.request].id)) -- request typename (tag=2)
 		else
 			table.insert(tmp, "\1\0")
 		end
 		if p.response then
-			table.insert(tmp, packvalue(alltypes[p.response])) -- request typename (tag=3)
+			table.insert(tmp, packvalue(alltypes[p.response].id)) -- request typename (tag=3)
 		else
 			tmp[1] = "\3\0"
 		end
@@ -327,7 +384,13 @@ local function packgroup(t,p)
 	end
 	table.sort(alltypes)	-- make result stable
 	for idx, name in ipairs(alltypes) do
-		alltypes[name] = idx - 1
+		local fields = {}
+		for _, type_fields in ipairs(t[name]) do
+			if buildin_types[type_fields.typename] then
+				fields[type_fields.name] = type_fields.tag
+			end
+		end
+		alltypes[name] = { id = idx - 1, fields = fields }
 	end
 	tt = {}
 	for _,name in ipairs(alltypes) do

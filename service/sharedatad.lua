@@ -1,6 +1,3 @@
---共享数据服务
---为了大量共享结构化数据却不常更新它们，比如配置文件
---只支持在同一节点内
 local mtask = require "mtask"
 local sharedata = require "sharedata.corelib"
 local table = table
@@ -47,7 +44,7 @@ function CMD.new(name, t)
 	elseif dt == "string" then
 		value = setmetatable({}, env_mt)
 		local f = load(t, "=" .. name, "t", value)
-		f()
+		assert(mtask.pcall(f))
 		setmetatable(value, nil)
 	elseif dt == "nil" then
 		value = {}

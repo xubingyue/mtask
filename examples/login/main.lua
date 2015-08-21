@@ -1,7 +1,6 @@
 local mtask = require "mtask"
 
 mtask.start(function()
-	mtask.newservice("debug_console",8000)
 	local loginserver = mtask.newservice("logind")
 	local gate = mtask.newservice("gated", loginserver)
 

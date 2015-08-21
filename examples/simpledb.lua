@@ -1,4 +1,5 @@
 local mtask = require "mtask"
+require "mtask.manager"	-- import mtask.register
 local db = {}
 
 local command = {}

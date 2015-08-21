@@ -1,9 +1,6 @@
---redis driver
-
 local mtask = require "mtask"
 local socket = require "socket"
 local socketchannel = require "socketchannel"
-local int64 = require "int64"
 
 local table = table
 local string = string
@@ -104,12 +101,8 @@ local function pack_value(lines, v)
 		return
 	end
 
-	local t = type(v)
-	if t == "number" then
-		v = tostring(v)
-	elseif t == "userdata" then
-		v = int64.tostring(int64.new(v),10)
-	end
+	v = tostring(v)
+
 	table.insert(lines,"$"..#v)
 	table.insert(lines,v)
 end
