@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "79CED6A61B6B140D00378C7E"
-               BuildableName = "mtask"
+               BuildableName = "mtaskm"
                BlueprintName = "mtask"
                ReferencedContainer = "container:mtask.xcodeproj">
             </BuildableReference>
@@ -33,7 +33,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "79CED6A61B6B140D00378C7E"
-            BuildableName = "mtask"
+            BuildableName = "mtaskm"
             BlueprintName = "mtask"
             ReferencedContainer = "container:mtask.xcodeproj">
          </BuildableReference>
@@ -53,7 +53,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "79CED6A61B6B140D00378C7E"
-            BuildableName = "mtask"
+            BuildableName = "mtaskm"
             BlueprintName = "mtask"
             ReferencedContainer = "container:mtask.xcodeproj">
          </BuildableReference>
@@ -82,7 +82,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "79CED6A61B6B140D00378C7E"
-            BuildableName = "mtask"
+            BuildableName = "mtaskm"
             BlueprintName = "mtask"
             ReferencedContainer = "container:mtask.xcodeproj">
          </BuildableReference>

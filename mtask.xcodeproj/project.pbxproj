@@ -190,7 +190,7 @@
 		799665621B859D5E00D3865E /* mtask_atomic.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = mtask_atomic.h; sourceTree = "<group>"; };
 		799665631B85A5A300D3865E /* mtask_spinlock.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = mtask_spinlock.h; sourceTree = "<group>"; };
 		7999CFEA1B72F4EA00CF7BA0 /* mtask_service_snlua.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = mtask_service_snlua.c; sourceTree = "<group>"; };
-		79CED6A71B6B140D00378C7E /* mtask */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = mtask; sourceTree = BUILT_PRODUCTS_DIR; };
+		79CED6A71B6B140D00378C7E /* mtaskm */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = mtaskm; sourceTree = BUILT_PRODUCTS_DIR; };
 		79CED6CB1B6B157800378C7E /* compat-5.2.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "compat-5.2.c"; sourceTree = "<group>"; };
 		79CED6CC1B6B157800378C7E /* compat-5.2.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "compat-5.2.h"; sourceTree = "<group>"; };
 		79CED6CD1B6B157800378C7E /* md5.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = md5.c; sourceTree = "<group>"; };
@@ -234,6 +234,7 @@
 		79DCE8CC1B78F31D002427E5 /* socket_server.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = socket_server.h; sourceTree = "<group>"; };
 		79E17CFE1B73321300491537 /* mtask_service_logger.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = mtask_service_logger.c; sourceTree = "<group>"; };
 		79E17D001B73563600491537 /* mtask_service_harbor.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = mtask_service_harbor.c; sourceTree = "<group>"; };
+		79F4E57C1B874076001B1C9B /* socket_epoll.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = socket_epoll.h; sourceTree = "<group>"; };
 		79F5EFA01B84824900792868 /* mtask_lua_mysqlaux.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = mtask_lua_mysqlaux.c; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -366,7 +367,7 @@
 		79CED6A81B6B140D00378C7E /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				79CED6A71B6B140D00378C7E /* mtask */,
+				79CED6A71B6B140D00378C7E /* mtaskm */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -453,6 +454,7 @@
 				79DCE8C81B78F31D002427E5 /* rwlock.h */,
 				79DCE8C91B78F31D002427E5 /* socket_kqueue.h */,
 				79DCE8CA1B78F31D002427E5 /* socket_poll.h */,
+				79F4E57C1B874076001B1C9B /* socket_epoll.h */,
 				79DCE8CB1B78F31D002427E5 /* socket_server.c */,
 				79DCE8CC1B78F31D002427E5 /* socket_server.h */,
 				799665621B859D5E00D3865E /* mtask_atomic.h */,
@@ -478,7 +480,7 @@
 			);
 			name = mtask;
 			productName = mtask;
-			productReference = 79CED6A71B6B140D00378C7E /* mtask */;
+			productReference = 79CED6A71B6B140D00378C7E /* mtaskm */;
 			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
@@ -702,7 +704,7 @@
 					./3rd/lua,
 				);
 				LIBRARY_SEARCH_PATHS = "";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "$(TARGET_NAME)m";
 			};
 			name = Debug;
 		};
@@ -715,7 +717,7 @@
 					./3rd/lua,
 				);
 				LIBRARY_SEARCH_PATHS = "";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "$(TARGET_NAME)m";
 			};
 			name = Release;
 		};
