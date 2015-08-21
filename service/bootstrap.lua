@@ -1,6 +1,4 @@
-print("will called bootstrap lua")
 local mtask = require "mtask"
-print("mtask called bootstrap_lua")
 local harbor = require "mtask.harbor"
 require "mtask.manager"	-- import mtask.launch, ...
 

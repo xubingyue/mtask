@@ -140,7 +140,7 @@ release_queue(struct harbor_msg_queue *queue) {
         return;
     }
     struct harbor_msg *m;
-    while ((m=pop_queue(queue))) {
+    while ((m=pop_queue(queue)) != NULL) {
         mtask_free(m->buffer);
     }
     mtask_free(queue->data);
@@ -290,8 +290,8 @@ forward_local_message(struct harbor *h,void *msg,int sz) {
     int type = (dst >> HANDLE_REMOTE_SHIFT) | PTYPE_TAG_DONT_COPY;
     dst = (dst & HANDLE_MASK) | ((uint32_t)h->id << HANDLE_REMOTE_SHIFT);
     
-    int size = sz - HEADER_COOKIE_LENGTH;
-    if (mtask_send(h->ctx, header.source, dst, type, (int)header.session,msg,size) < 0) {
+    
+    if (mtask_send(h->ctx, header.source, dst, type, (int)header.session, (void *)msg, sz-HEADER_COOKIE_LENGTH) < 0) {
         /*harbor can post error message back when the destination is not exist : fixed*/
         mtask_send(h->ctx, dst, header.source , PTYPE_ERROR, (int)header.session, NULL, 0);
         mtask_error(h->ctx, "Unknown destination :%x from :%x", dst, header.source);
@@ -301,6 +301,10 @@ forward_local_message(struct harbor *h,void *msg,int sz) {
 static void
 send_remote(struct mtask_context * ctx, int fd, const char * buffer, size_t sz, struct remote_message_header * cookie) {
     size_t sz_header = sz+sizeof(*cookie);
+	if (sz_header > UINT32_MAX) {
+		mtask_error(ctx, "remote message from :%08x to :%08x is too large.", cookie->source, cookie->destination);
+		return;
+	}
     uint8_t * sendbuf = mtask_malloc(sz_header+4);
     to_bigendian(sendbuf, (uint32_t)sz_header);
     memcpy(sendbuf+4, buffer, sz);
@@ -359,7 +363,7 @@ dispatch_queue(struct harbor *h,int id) {
     struct harbor_msg *m;
     while ((m=pop_queue(queue)) != NULL) {
         send_remote(h->ctx, fd, m->buffer, m->size, &m->header);
-        mtask_free(queue);
+        mtask_free(m->buffer);
     }
     release_queue(queue);
     s->queue = NULL;

@@ -22,7 +22,7 @@
 #define BACKLOG 32
 
 struct connection {
-    int id;
+    int id;//socket id
     uint32_t agent;
     uint32_t client;
     char remote_name[32];
